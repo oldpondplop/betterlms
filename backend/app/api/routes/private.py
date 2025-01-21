@@ -16,9 +16,10 @@ router = APIRouter(tags=["private"], prefix="/private")
 class PrivateUserCreate(BaseModel):
     email: str
     password: str
-    full_name: str
-    is_verified: bool = False
-
+    name: str
+    is_active: bool = True
+    is_superuser: bool = False
+    role: str = "employee"
 
 @router.post("/users/", response_model=UserPublic)
 def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
@@ -28,11 +29,15 @@ def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
 
     user = User(
         email=user_in.email,
-        full_name=user_in.full_name,
+        name=user_in.name,
         hashed_password=get_password_hash(user_in.password),
+        is_active=user_in.is_active,
+        is_superuser=user_in.is_superuser,
+        role=user_in.role,
     )
 
     session.add(user)
     session.commit()
+    session.refresh(user)
 
     return user

@@ -13,7 +13,6 @@ from app.api.deps import (
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.models import (
-    Item,
     Message,
     UpdatePassword,
     User,
@@ -38,7 +37,6 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     """
     Retrieve users.
     """
-
     count_statement = select(func.count()).select_from(User)
     count = session.exec(count_statement).one()
 
@@ -49,7 +47,8 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
 
 
 @router.post(
-    "/", dependencies=[Depends(get_current_active_superuser)], response_model=UserPublic
+    "/", dependencies=[Depends(get_current_active_superuser)], 
+    response_model=UserPublic
 )
 def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
     """
@@ -106,10 +105,6 @@ def update_password_me(
     """
     if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
-    if body.current_password == body.new_password:
-        raise HTTPException(
-            status_code=400, detail="New password cannot be the same as the current one"
-        )
     hashed_password = get_password_hash(body.new_password)
     current_user.hashed_password = hashed_password
     session.add(current_user)
@@ -134,8 +129,6 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
-    statement = delete(Item).where(col(Item.owner_id) == current_user.id)
-    session.exec(statement)  # type: ignore
     session.delete(current_user)
     session.commit()
     return Message(message="User deleted successfully")
@@ -189,7 +182,6 @@ def update_user(
     """
     Update a user.
     """
-
     db_user = session.get(User, user_id)
     if not db_user:
         raise HTTPException(
@@ -202,7 +194,6 @@ def update_user(
             raise HTTPException(
                 status_code=409, detail="User with this email already exists"
             )
-
     db_user = crud.update_user(session=session, db_user=db_user, user_in=user_in)
     return db_user
 
@@ -221,8 +212,6 @@ def delete_user(
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
-    statement = delete(Item).where(col(Item.owner_id) == user_id)
-    session.exec(statement)  # type: ignore
     session.delete(user)
     session.commit()
     return Message(message="User deleted successfully")
