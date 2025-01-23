@@ -13,6 +13,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Select,
 } from "@chakra-ui/react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
@@ -44,12 +45,14 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
+      user_id: "",  
+      name: "",  
       email: "",
-      full_name: "",
       password: "",
       confirm_password: "",
+      role: "employee",
       is_superuser: false,
-      is_active: false,
+      is_active: true,
     },
   })
 
@@ -70,112 +73,117 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
   })
 
   const onSubmit: SubmitHandler<UserCreateForm> = (data) => {
-    mutation.mutate(data)
+    console.log(data)
+    const { confirm_password, ...userData } = data // Remove confirm_password before sending
+    mutation.mutate(userData)
   }
 
   return (
-    <>
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        size={{ base: "sm", md: "md" }}
-        isCentered
-      >
-        <ModalOverlay />
-        <ModalContent as="form" onSubmit={handleSubmit(onSubmit)}>
-          <ModalHeader>Add User</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody pb={6}>
-            <FormControl isRequired isInvalid={!!errors.email}>
-              <FormLabel htmlFor="email">Email</FormLabel>
-              <Input
-                id="email"
-                {...register("email", {
-                  required: "Email is required",
-                  pattern: emailPattern,
-                })}
-                placeholder="Email"
-                type="email"
-              />
-              {errors.email && (
-                <FormErrorMessage>{errors.email.message}</FormErrorMessage>
-              )}
+    <Modal isOpen={isOpen} onClose={onClose} size="md" isCentered>
+      <ModalOverlay />
+      <ModalContent as="form" onSubmit={handleSubmit(onSubmit)}>
+        <ModalHeader>Add User</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody pb={6}>
+          <FormControl isRequired isInvalid={!!errors.user_id}>
+            <FormLabel htmlFor="user_id">User ID</FormLabel>
+            <Input
+              id="user_id"
+              {...register("user_id", { required: "User ID is required" })}
+              placeholder="Enter unique User ID"
+              type="text"
+            />
+            {errors.user_id && <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>}
+          </FormControl>
+
+          <FormControl mt={4} isRequired isInvalid={!!errors.name}>
+            <FormLabel htmlFor="name">Full Name</FormLabel>
+            <Input
+              id="name"
+              {...register("name", { required: "Full name is required" })}
+              placeholder="Full Name"
+              type="text"
+            />
+            {errors.name && <FormErrorMessage>{errors.name.message}</FormErrorMessage>}
+          </FormControl>
+
+          <FormControl mt={4} isRequired isInvalid={!!errors.email}>
+            <FormLabel htmlFor="email">Email</FormLabel>
+            <Input
+              id="email"
+              {...register("email", {
+                required: "Email is required",
+                pattern: emailPattern,
+              })}
+              placeholder="Email"
+              type="email"
+            />
+            {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
+          </FormControl>
+
+          <FormControl mt={4} isRequired isInvalid={!!errors.password}>
+            <FormLabel htmlFor="password">Password</FormLabel>
+            <Input
+              id="password"
+              {...register("password", {
+                required: "Password is required",
+                minLength: {
+                  value: 8,
+                  message: "Password must be at least 8 characters",
+                },
+              })}
+              placeholder="Password"
+              type="password"
+            />
+            {errors.password && <FormErrorMessage>{errors.password.message}</FormErrorMessage>}
+          </FormControl>
+
+          <FormControl mt={4} isRequired isInvalid={!!errors.confirm_password}>
+            <FormLabel htmlFor="confirm_password">Confirm Password</FormLabel>
+            <Input
+              id="confirm_password"
+              {...register("confirm_password", {
+                required: "Please confirm your password",
+                validate: (value) =>
+                  value === getValues().password || "The passwords do not match",
+              })}
+              placeholder="Confirm Password"
+              type="password"
+            />
+            {errors.confirm_password && (
+              <FormErrorMessage>{errors.confirm_password.message}</FormErrorMessage>
+            )}
+          </FormControl>
+
+          <FormControl mt={4}>
+            <FormLabel htmlFor="role">Role</FormLabel>
+            <Select id="role" {...register("role")}>
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+            </Select>
+          </FormControl>
+
+          <Flex mt={4}>
+            <FormControl>
+              <Checkbox {...register("is_superuser")} colorScheme="teal">
+                Is Superuser?
+              </Checkbox>
             </FormControl>
-            <FormControl mt={4} isInvalid={!!errors.full_name}>
-              <FormLabel htmlFor="name">Full name</FormLabel>
-              <Input
-                id="name"
-                {...register("full_name")}
-                placeholder="Full name"
-                type="text"
-              />
-              {errors.full_name && (
-                <FormErrorMessage>{errors.full_name.message}</FormErrorMessage>
-              )}
+            <FormControl>
+              <Checkbox {...register("is_active")} colorScheme="teal">
+                Is Active?
+              </Checkbox>
             </FormControl>
-            <FormControl mt={4} isRequired isInvalid={!!errors.password}>
-              <FormLabel htmlFor="password">Set Password</FormLabel>
-              <Input
-                id="password"
-                {...register("password", {
-                  required: "Password is required",
-                  minLength: {
-                    value: 8,
-                    message: "Password must be at least 8 characters",
-                  },
-                })}
-                placeholder="Password"
-                type="password"
-              />
-              {errors.password && (
-                <FormErrorMessage>{errors.password.message}</FormErrorMessage>
-              )}
-            </FormControl>
-            <FormControl
-              mt={4}
-              isRequired
-              isInvalid={!!errors.confirm_password}
-            >
-              <FormLabel htmlFor="confirm_password">Confirm Password</FormLabel>
-              <Input
-                id="confirm_password"
-                {...register("confirm_password", {
-                  required: "Please confirm your password",
-                  validate: (value) =>
-                    value === getValues().password ||
-                    "The passwords do not match",
-                })}
-                placeholder="Password"
-                type="password"
-              />
-              {errors.confirm_password && (
-                <FormErrorMessage>
-                  {errors.confirm_password.message}
-                </FormErrorMessage>
-              )}
-            </FormControl>
-            <Flex mt={4}>
-              <FormControl>
-                <Checkbox {...register("is_superuser")} colorScheme="teal">
-                  Is superuser?
-                </Checkbox>
-              </FormControl>
-              <FormControl>
-                <Checkbox {...register("is_active")} colorScheme="teal">
-                  Is active?
-                </Checkbox>
-              </FormControl>
-            </Flex>
-          </ModalBody>
-          <ModalFooter gap={3}>
-            <Button variant="primary" type="submit" isLoading={isSubmitting}>
-              Save
-            </Button>
-            <Button onClick={onClose}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </>
+          </Flex>
+        </ModalBody>
+        <ModalFooter gap={3}>
+          <Button variant="primary" type="submit" isLoading={isSubmitting}>
+            Save
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   )
 }
 

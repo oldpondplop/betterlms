@@ -13,6 +13,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Select,
 } from "@chakra-ui/react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
@@ -32,10 +33,6 @@ interface EditUserProps {
   onClose: () => void
 }
 
-interface UserUpdateForm extends UserUpdate {
-  confirm_password: string
-}
-
 const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
   const queryClient = useQueryClient()
   const showToast = useCustomToast()
@@ -44,17 +41,23 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
     register,
     handleSubmit,
     reset,
-    getValues,
     formState: { errors, isSubmitting, isDirty },
-  } = useForm<UserUpdateForm>({
+  } = useForm<UserUpdate>({
     mode: "onBlur",
     criteriaMode: "all",
-    defaultValues: user,
+    defaultValues: {
+      user_id: user.user_id, 
+      name: user.name,
+      email: user.email,
+      role: user.role || "employee",
+      is_superuser: user.is_superuser,
+      is_active: user.is_active,
+    },
   })
 
   const mutation = useMutation({
-    mutationFn: (data: UserUpdateForm) =>
-      UsersService.updateUser({ userId: user.id, requestBody: data }),
+    mutationFn: (data: UserUpdate) =>
+      UsersService.updateUser({ userId: user.id, requestBody: data }), 
     onSuccess: () => {
       showToast("Success!", "User updated successfully.", "success")
       onClose()
@@ -67,10 +70,7 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
     },
   })
 
-  const onSubmit: SubmitHandler<UserUpdateForm> = async (data) => {
-    if (data.password === "") {
-      data.password = undefined
-    }
+  const onSubmit: SubmitHandler<UserUpdate> = async (data) => {
     mutation.mutate(data)
   }
 
@@ -80,100 +80,81 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
   }
 
   return (
-    <>
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        size={{ base: "sm", md: "md" }}
-        isCentered
-      >
-        <ModalOverlay />
-        <ModalContent as="form" onSubmit={handleSubmit(onSubmit)}>
-          <ModalHeader>Edit User</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody pb={6}>
-            <FormControl isInvalid={!!errors.email}>
-              <FormLabel htmlFor="email">Email</FormLabel>
-              <Input
-                id="email"
-                {...register("email", {
-                  required: "Email is required",
-                  pattern: emailPattern,
-                })}
-                placeholder="Email"
-                type="email"
-              />
-              {errors.email && (
-                <FormErrorMessage>{errors.email.message}</FormErrorMessage>
-              )}
-            </FormControl>
-            <FormControl mt={4}>
-              <FormLabel htmlFor="name">Full name</FormLabel>
-              <Input id="name" {...register("full_name")} type="text" />
-            </FormControl>
-            <FormControl mt={4} isInvalid={!!errors.password}>
-              <FormLabel htmlFor="password">Set Password</FormLabel>
-              <Input
-                id="password"
-                {...register("password", {
-                  minLength: {
-                    value: 8,
-                    message: "Password must be at least 8 characters",
-                  },
-                })}
-                placeholder="Password"
-                type="password"
-              />
-              {errors.password && (
-                <FormErrorMessage>{errors.password.message}</FormErrorMessage>
-              )}
-            </FormControl>
-            <FormControl mt={4} isInvalid={!!errors.confirm_password}>
-              <FormLabel htmlFor="confirm_password">Confirm Password</FormLabel>
-              <Input
-                id="confirm_password"
-                {...register("confirm_password", {
-                  validate: (value) =>
-                    value === getValues().password ||
-                    "The passwords do not match",
-                })}
-                placeholder="Password"
-                type="password"
-              />
-              {errors.confirm_password && (
-                <FormErrorMessage>
-                  {errors.confirm_password.message}
-                </FormErrorMessage>
-              )}
-            </FormControl>
-            <Flex>
-              <FormControl mt={4}>
-                <Checkbox {...register("is_superuser")} colorScheme="teal">
-                  Is superuser?
-                </Checkbox>
-              </FormControl>
-              <FormControl mt={4}>
-                <Checkbox {...register("is_active")} colorScheme="teal">
-                  Is active?
-                </Checkbox>
-              </FormControl>
-            </Flex>
-          </ModalBody>
+    <Modal isOpen={isOpen} onClose={onClose} size="md" isCentered>
+      <ModalOverlay />
+      <ModalContent as="form" onSubmit={handleSubmit(onSubmit)}>
+        <ModalHeader>Edit User</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody pb={6}>
+          {/* Editable User ID (admin-defined, not UUID) */}
+          <FormControl isRequired isInvalid={!!errors.user_id}>
+            <FormLabel htmlFor="user_id">User ID</FormLabel>
+            <Input
+              id="user_id"
+              {...register("user_id", { required: "User ID is required" })}
+              placeholder="Enter User ID"
+              type="text"
+            />
+            {errors.user_id && <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>}
+          </FormControl>
 
-          <ModalFooter gap={3}>
-            <Button
-              variant="primary"
-              type="submit"
-              isLoading={isSubmitting}
-              isDisabled={!isDirty}
-            >
-              Save
-            </Button>
-            <Button onClick={onCancel}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </>
+          {/* Full Name */}
+          <FormControl mt={4} isRequired isInvalid={!!errors.name}>
+            <FormLabel htmlFor="name">Full Name</FormLabel>
+            <Input
+              id="name"
+              {...register("name", { required: "Full name is required" })}
+              type="text"
+            />
+            {errors.name && <FormErrorMessage>{errors.name.message}</FormErrorMessage>}
+          </FormControl>
+
+          {/* Email */}
+          <FormControl mt={4} isRequired isInvalid={!!errors.email}>
+            <FormLabel htmlFor="email">Email</FormLabel>
+            <Input
+              id="email"
+              {...register("email", {
+                required: "Email is required",
+                pattern: emailPattern,
+              })}
+              type="email"
+            />
+            {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
+          </FormControl>
+
+          {/* Role Selection */}
+          <FormControl mt={4}>
+            <FormLabel htmlFor="role">Role</FormLabel>
+            <Select id="role" {...register("role")}>
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+            </Select>
+          </FormControl>
+
+          {/* Checkboxes for Superuser & Active Status */}
+          <Flex mt={4}>
+            <FormControl>
+              <Checkbox {...register("is_superuser")} colorScheme="teal">
+                Is Superuser?
+              </Checkbox>
+            </FormControl>
+            <FormControl>
+              <Checkbox {...register("is_active")} colorScheme="teal">
+                Is Active?
+              </Checkbox>
+            </FormControl>
+          </Flex>
+        </ModalBody>
+
+        <ModalFooter gap={3}>
+          <Button variant="primary" type="submit" isLoading={isSubmitting} isDisabled={!isDirty}>
+            Save
+          </Button>
+          <Button onClick={onCancel}>Cancel</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   )
 }
 

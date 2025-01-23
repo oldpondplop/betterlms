@@ -49,7 +49,7 @@ function UsersTable() {
   const { page } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const setPage = (page: number) =>
-    navigate({ search: (prev: {[key: string]: string}) => ({ ...prev, page }) })
+    navigate({ search: (prev: { [key: string]: string }) => ({ ...prev, page }) })
 
   const {
     data: users,
@@ -70,82 +70,58 @@ function UsersTable() {
   }, [page, queryClient, hasNextPage])
 
   return (
-    <>
-      <TableContainer>
-        <Table size={{ base: "sm", md: "md" }}>
-          <Thead>
-            <Tr>
-              <Th width="20%">Full name</Th>
-              <Th width="50%">Email</Th>
-              <Th width="10%">Role</Th>
-              <Th width="10%">Status</Th>
-              <Th width="10%">Actions</Th>
-            </Tr>
-          </Thead>
+    <TableContainer>
+      <Table size={{ base: "sm", md: "md" }}>
+        <Thead>
+          <Tr>
+            <Th width="15%">User ID</Th>
+            <Th width="20%">Full Name</Th>
+            <Th width="30%">Email</Th>
+            <Th width="10%">Role</Th>
+            <Th width="10%">Status</Th>
+            <Th width="15%">Actions</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {isPending ? (
-            <Tbody>
-              <Tr>
-                {new Array(4).fill(null).map((_, index) => (
-                  <Td key={index}>
-                    <SkeletonText noOfLines={1} paddingBlock="16px" />
-                  </Td>
-                ))}
-              </Tr>
-            </Tbody>
-          ) : (
-            <Tbody>
-              {users?.data.map((user) => (
-                <Tr key={user.id}>
-                  <Td
-                    color={!user.full_name ? "ui.dim" : "inherit"}
-                    isTruncated
-                    maxWidth="150px"
-                  >
-                    {user.full_name || "N/A"}
-                    {currentUser?.id === user.id && (
-                      <Badge ml="1" colorScheme="teal">
-                        You
-                      </Badge>
-                    )}
-                  </Td>
-                  <Td isTruncated maxWidth="150px">
-                    {user.email}
-                  </Td>
-                  <Td>{user.is_superuser ? "Superuser" : "User"}</Td>
-                  <Td>
-                    <Flex gap={2}>
-                      <Box
-                        w="2"
-                        h="2"
-                        borderRadius="50%"
-                        bg={user.is_active ? "ui.success" : "ui.danger"}
-                        alignSelf="center"
-                      />
-                      {user.is_active ? "Active" : "Inactive"}
-                    </Flex>
-                  </Td>
-                  <Td>
-                    <ActionsMenu
-                      type="User"
-                      value={user}
-                      disabled={currentUser?.id === user.id}
-                    />
-                  </Td>
-                </Tr>
+            <Tr>
+              {[...Array(6)].map((_, index) => (
+                <Td key={index}>
+                  <SkeletonText noOfLines={1} paddingBlock="16px" />
+                </Td>
               ))}
-            </Tbody>
+            </Tr>
+          ) : (
+            users?.data.map((user) => (
+              <Tr key={user.id}>
+                <Td isTruncated maxWidth="120px">{user.user_id || "N/A"}</Td>
+                <Td isTruncated maxWidth="150px" color={!user.name ? "ui.dim" : "inherit"}>
+                  {user.name || "N/A"}
+                  {currentUser?.id === user.id && (
+                    <Badge ml="1" colorScheme="teal">You</Badge>
+                  )}
+                </Td>
+                <Td isTruncated maxWidth="200px">{user.email}</Td>
+                <Td>{user.is_superuser ? "Superuser" : "User"}</Td>
+                <Td>
+                  <Flex gap={2}>
+                    <Box w="2" h="2" borderRadius="50%" bg={user.is_active ? "ui.success" : "ui.danger"} alignSelf="center" />
+                    {user.is_active ? "Active" : "Inactive"}
+                  </Flex>
+                </Td>
+                <Td>
+                  <ActionsMenu type="User" value={user} disabled={currentUser?.id === user.id} />
+                </Td>
+              </Tr>
+            ))
           )}
-        </Table>
-      </TableContainer>
-      <PaginationFooter
-        onChangePage={setPage}
-        page={page}
-        hasNextPage={hasNextPage}
-        hasPreviousPage={hasPreviousPage}
-      />
-    </>
+        </Tbody>
+      </Table>
+      <PaginationFooter onChangePage={setPage} page={page} hasNextPage={hasNextPage} hasPreviousPage={hasPreviousPage} />
+    </TableContainer>
   )
 }
+
 
 function Admin() {
   return (
@@ -159,3 +135,5 @@ function Admin() {
     </Container>
   )
 }
+
+export default Admin

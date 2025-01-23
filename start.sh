@@ -1,6 +1,9 @@
 #!/bin/bash
 
-set -e  # Exit on error
+set -e 
+# set -x
+
+./generate-client.sh
 
 # Function to clean up background processes
 cleanup() {

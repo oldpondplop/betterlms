@@ -28,11 +28,8 @@ class UserRegister(SQLModel):
     password: str = Field(min_length=8, max_length=40)
     name: str | None = Field(default=None, max_length=255)
 
-class UserUpdate(SQLModel):
-    name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
-    is_active: bool | None = None
-    role: Role | None = None
+class UserUpdate(UserBase):
+    pass
 
 class UserUpdateMe(SQLModel):
     name: str | None = Field(default=None, max_length=255)

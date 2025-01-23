@@ -1,10 +1,12 @@
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import emails  # type: ignore
+from fastapi import Request
 import jwt
 from jinja2 import Template
 from jwt.exceptions import InvalidTokenError
@@ -121,3 +123,23 @@ def verify_password_reset_token(token: str) -> str | None:
         return str(decoded_token["sub"])
     except InvalidTokenError:
         return None
+
+async def log_request(request: Request, call_next: Callable) -> None:
+    """Logs details of an incoming FastAPI request (headers, body, method, URL)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = await request.body()
+        body = body.decode() if body else "No Body"
+
+    log_data = {
+        "method": request.method,
+        "url": str(request.url),
+        "headers": dict(request.headers),
+        "body": body,
+    }
+
+    print("Incoming Request:\n" + json.dumps(log_data, indent=4))
+    response = await call_next(request)
+    print(json.dumps({"response_status": response.status_code}, indent=4))
+    return response
