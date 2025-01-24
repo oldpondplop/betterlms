@@ -39,7 +39,6 @@ class Role(str, Enum):
     You can extend or modify as needed.
     """
     ADMIN = "admin"
-    DEFAULT = "employee"
     INFIRMIERA = "infirmiera"
     OFICIANTA = "oficianta"
     BRANCARDIER = "brancardier"
@@ -66,7 +65,7 @@ class UserBase(SQLModel):
     user_id: str = Field(unique=True, index=True, max_length=50)
     name: str = Field(max_length=255)
     email: EmailStr = Field(unique=True, index=True, max_length=255)
-    role: Role = Field(default=Role.DEFAULT)
+    role: Role = Field(description="User role")
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
 
@@ -85,9 +84,17 @@ class UsersPublic(SQLModel):
     data: List[UserPublic]
     count: int
 
-class UserUpdate(UserBase):
-    """Properties to receive via API on update."""
-    pass
+class UserUpdate(SQLModel):
+    """
+    Used to update an existing user. All fields optional.
+    """
+    user_id: Optional[str] = Field(default=None, max_length=50)
+    name: Optional[str] = Field(default=None, max_length=255)
+    email: Optional[EmailStr] = Field(default=None, max_length=255)
+    role: Optional[Role] = None
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
+    password: Optional[str] = Field(default=None, min_length=8, max_length=40)
 
 class UserCreate(UserBase):
     """Properties used when creating a new user through the API."""
