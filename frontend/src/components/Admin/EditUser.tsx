@@ -13,7 +13,6 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Select,
 } from "@chakra-ui/react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
@@ -49,7 +48,7 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
       user_id: user.user_id, 
       name: user.name,
       email: user.email,
-      role: user.role || "employee",
+      // role: user.role,
       is_superuser: user.is_superuser,
       is_active: user.is_active,
     },
@@ -121,15 +120,6 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
               type="email"
             />
             {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
-          </FormControl>
-
-          {/* Role Selection */}
-          <FormControl mt={4}>
-            <FormLabel htmlFor="role">Role</FormLabel>
-            <Select id="role" {...register("role")}>
-              <option value="employee">Employee</option>
-              <option value="admin">Admin</option>
-            </Select>
           </FormControl>
 
           {/* Checkboxes for Superuser & Active Status */}
