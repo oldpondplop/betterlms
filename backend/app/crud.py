@@ -19,12 +19,14 @@ def authenticate_user(*, session: Session, email: str, password: str) -> User | 
         return None
     return db_user
 
-def create_course(*, session: Session, course_create: CourseCreate) -> Course:
-    db_course = Course.model_validate(course_create)
+def create_course(session: Session, course_create: CourseCreate) -> Course:
+    db_course = Course(**course_create.dict(exclude={"assign_to_roles", "assign_to_user_id"}))
+    db_course.assigned_roles = course_create.assign_to_roles or []  # ✅ Ensure roles are assigned
     session.add(db_course)
     session.commit()
     session.refresh(db_course)
     return db_course
+
 
 def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> User:
     user_data = user_in.model_dump(exclude_unset=True)

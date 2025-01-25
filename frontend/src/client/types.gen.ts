@@ -9,6 +9,46 @@ export type Body_login_login_access_token = {
   client_secret?: string | null
 }
 
+export type CourseAssignment = {
+  id?: string
+  course_id: string
+  user_id: string
+}
+
+export type CourseCreate = {
+  title: string
+  description?: string | null
+  materials?: Array<string> | null
+  assign_to_roles?: Array<string> | null
+  is_active?: boolean
+  is_due?: boolean
+  due_date?: string | null
+  start_date?: string | null
+  assign_to_user_id?: string | null
+}
+
+export type CoursePublic = {
+  title: string
+  description?: string | null
+  materials?: Array<string> | null
+  assign_to_roles: Array<string>
+  is_active?: boolean
+  is_due?: boolean
+  due_date?: string | null
+  start_date?: string | null
+  id: string
+}
+
+export type CourseUpdate = {
+  title?: string | null
+  description?: string | null
+  is_active?: boolean | null
+  is_due?: boolean | null
+  due_date?: string | null
+  start_date?: string | null
+  assign_to_roles?: Array<string> | null
+}
+
 export type HTTPValidationError = {
   detail?: Array<ValidationError>
 }
@@ -31,7 +71,58 @@ export type PrivateUserCreate = {
   role?: string
 }
 
-export type Role = "admin" | "employee"
+export type QuizAttempt = {
+  id?: string
+  quiz_id: string
+  user_id: string
+  score: number
+  attempt_number: number
+  passed?: boolean
+}
+
+export type QuizBase = {
+  max_attempts?: number
+  passing_threshold?: number
+}
+
+export type QuizCreate = {
+  max_attempts?: number
+  passing_threshold?: number
+  course_id: string
+  questions?: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type QuizPublic = {
+  max_attempts?: number
+  passing_threshold?: number
+  id: string
+  course_id: string
+  questions: Array<{
+    [key: string]: unknown
+  }>
+  attempts: Array<QuizAttempt>
+}
+
+export type Role =
+  | "admin"
+  | "employee"
+  | "infirmiera"
+  | "oficianta"
+  | "brancardier"
+  | "asistent medical"
+  | "femeie de serviciu"
+  | "masaj"
+  | "kinetoterapie"
+  | "receptie"
+  | "contabilitate"
+  | "informatica"
+  | "resurse umane"
+  | "epidemiolog"
+  | "managementul calitatii"
+  | "farmacist"
+  | "birou internari/externari"
 
 export type Token = {
   access_token: string
@@ -94,6 +185,45 @@ export type ValidationError = {
   type: string
 }
 
+export type CoursesReadCoursesData = {
+  limit?: number
+  skip?: number
+}
+
+export type CoursesReadCoursesResponse = Array<CoursePublic>
+
+export type CoursesCreateCourseData = {
+  requestBody: CourseCreate
+}
+
+export type CoursesCreateCourseResponse = CoursePublic
+
+export type CoursesReadCourseByIdData = {
+  courseId: string
+}
+
+export type CoursesReadCourseByIdResponse = CoursePublic
+
+export type CoursesUpdateCourseData = {
+  courseId: string
+  requestBody: CourseUpdate
+}
+
+export type CoursesUpdateCourseResponse = CoursePublic
+
+export type CoursesDeleteCourseData = {
+  courseId: string
+}
+
+export type CoursesDeleteCourseResponse = Message
+
+export type CoursesAssignCourseData = {
+  courseId: string
+  userId: string
+}
+
+export type CoursesAssignCourseResponse = CourseAssignment
+
 export type LoginLoginAccessTokenData = {
   formData: Body_login_login_access_token
 }
@@ -125,6 +255,52 @@ export type PrivateCreateUserData = {
 }
 
 export type PrivateCreateUserResponse = UserPublic
+
+export type QuizzesReadQuizzesData = {
+  limit?: number
+  skip?: number
+}
+
+export type QuizzesReadQuizzesResponse = Array<QuizBase>
+
+export type QuizzesCreateQuizData = {
+  courseId: string
+  requestBody: QuizCreate
+}
+
+export type QuizzesCreateQuizResponse = QuizPublic
+
+export type QuizzesReadQuizByIdData = {
+  quizId: string
+}
+
+export type QuizzesReadQuizByIdResponse = QuizBase
+
+export type QuizzesUpdateQuizData = {
+  quizId: string
+  requestBody: QuizCreate
+}
+
+export type QuizzesUpdateQuizResponse = QuizBase
+
+export type QuizzesDeleteQuizData = {
+  quizId: string
+}
+
+export type QuizzesDeleteQuizResponse = Message
+
+export type QuizzesSubmitQuizAttemptData = {
+  quizId: string
+  score: number
+}
+
+export type QuizzesSubmitQuizAttemptResponse = QuizAttempt
+
+export type QuizzesGetQuizAttemptsData = {
+  quizId: string
+}
+
+export type QuizzesGetQuizAttemptsResponse = Array<QuizAttempt>
 
 export type UsersReadUsersData = {
   limit?: number
