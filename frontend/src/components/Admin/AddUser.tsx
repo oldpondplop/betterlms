@@ -18,10 +18,11 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
 
-import { type UserCreate, UsersService } from "../../client"
+import { RoleEnum, type UserCreate, UsersService } from "../../client"
 import type { ApiError } from "../../client/core/ApiError"
 import useCustomToast from "../../hooks/useCustomToast"
 import { emailPattern, handleError } from "../../utils"
+
 
 interface AddUserProps {
   isOpen: boolean
@@ -50,7 +51,6 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
       email: "",
       password: "",
       confirm_password: "",
-      role: "employee",
       is_superuser: false,
       is_active: true,
     },
@@ -73,8 +73,7 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
   })
 
   const onSubmit: SubmitHandler<UserCreateForm> = (data) => {
-    console.log(data)
-    const { confirm_password, ...userData } = data // Remove confirm_password before sending
+    const { confirm_password, ...userData } = data
     mutation.mutate(userData)
   }
 
@@ -154,14 +153,18 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
               <FormErrorMessage>{errors.confirm_password.message}</FormErrorMessage>
             )}
           </FormControl>
-
-          <FormControl mt={4}>
-            <FormLabel htmlFor="role">Role</FormLabel>
-            <Select id="role" {...register("role")}>
-              <option value="employee">Employee</option>
-              <option value="admin">Admin</option>
-            </Select>
-          </FormControl>
+          
+          <FormControl mt={4} isRequired isInvalid={!!errors.role_name}>
+            <FormLabel htmlFor="role_name">Role</FormLabel>
+              <Select id="role_name" {...register("role_name", { required: "Role is required" })}>
+                {Object.entries(RoleEnum).map(([key, role]) => (
+                  <option key={key} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            {errors.role_name && <FormErrorMessage>{errors.role_name.message}</FormErrorMessage>}
+        </FormControl>
 
           <Flex mt={4}>
             <FormControl>

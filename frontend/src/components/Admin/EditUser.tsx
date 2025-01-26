@@ -13,6 +13,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Select,
 } from "@chakra-ui/react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
@@ -21,6 +22,7 @@ import {
   type ApiError,
   type UserPublic,
   type UserUpdate,
+  RoleEnum,
   UsersService,
 } from "../../client"
 import useCustomToast from "../../hooks/useCustomToast"
@@ -48,7 +50,7 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
       user_id: user.user_id, 
       name: user.name,
       email: user.email,
-      // role: user.role,
+      role_name: user.role_name || undefined,
       is_superuser: user.is_superuser,
       is_active: user.is_active,
     },
@@ -120,6 +122,19 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
               type="email"
             />
             {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
+          </FormControl>
+          
+          {/* Role */}
+          <FormControl mt={4} isRequired isInvalid={!!errors.role_name}>
+            <FormLabel htmlFor="role_name">Role</FormLabel>
+              <Select id="role_name" {...register("role_name", { required: "Role is required" })}>
+                {Object.entries(RoleEnum).map(([key, role]) => (
+                  <option key={key} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            {errors.role_name && <FormErrorMessage>{errors.role_name.message}</FormErrorMessage>}
           </FormControl>
 
           {/* Checkboxes for Superuser & Active Status */}

@@ -22,7 +22,7 @@ import { type UserPublic, UsersService } from "../../client"
 import AddUser from "../../components/Admin/AddUser"
 import ActionsMenu from "../../components/Common/ActionsMenu"
 import Navbar from "../../components/Common/Navbar"
-import { PaginationFooter } from "../../components/Common/PaginationFooter.tsx"
+import { PaginationFooter } from "../../components/Common/PaginationFooter"
 
 const usersSearchSchema = z.object({
   page: z.number().catch(1),
@@ -102,7 +102,7 @@ function UsersTable() {
                   )}
                 </Td>
                 <Td isTruncated maxWidth="200px">{user.email}</Td>
-                <Td>{user.is_superuser ? "Superuser" : "User"}</Td>
+                <Td>{user.is_superuser ? "Superuser" : user.role_name.charAt(0).toUpperCase() + user.role_name.slice(1)}</Td>
                 <Td>
                   <Flex gap={2}>
                     <Box w="2" h="2" borderRadius="50%" bg={user.is_active ? "ui.success" : "ui.danger"} alignSelf="center" />
