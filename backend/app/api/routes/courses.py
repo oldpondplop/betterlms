@@ -48,7 +48,20 @@ def read_courses(
     )
     count = session.exec(select(func.count()).select_from(base_query.subquery())).one()
     courses = session.exec(base_query.offset(skip).limit(limit)).all()
-    return CoursesPublic(data=courses, count=count)
+
+    public_courses = [
+        CoursePublic(
+            id=course.id,
+            title=course.title,
+            description=course.description,
+            assigned_users=[a.user_id for a in course.assignments],
+            assigned_roles=list(set(a.role_name for a in course.assignments))  
+        )
+        for course in courses
+    ]
+
+    return CoursesPublic(data=public_courses, count=count)
+    # return CoursesPublic(data=courses, count=count)
 
 @router.post("/", response_model=Message)
 def create_course(

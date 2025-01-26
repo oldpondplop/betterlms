@@ -10,6 +10,8 @@ from sqlmodel import (
     Relationship,
     Column,
     Enum as SAEnum,
+    Session,
+    select,
 )
 
 # =========================================================
@@ -151,10 +153,29 @@ class CourseUpdate(SQLModel):
     end_date: Optional[date] = None
     assigned_user_emails: Optional[EmailStr] = None
     assigned_role_names: Optional[RoleEnum] = None
-
-class CoursePublic(CourseBase):
-    """Public response model with additional fields"""
+    
+class CoursePublic(SQLModel):
+    """Public response model including assigned users and roles"""
     id: uuid.UUID
+    title: str
+    description: str | None = None
+    assigned_users: list[uuid.UUID] | None = None
+    assigned_roles: list[RoleEnum] | None = None
+
+    @classmethod
+    def _from_orm(cls, course: Course, session: Session):
+        """Convert a Course ORM object to a CoursePublic response model"""
+        assignments = session.exec(
+            select(CourseAssignment).where(CourseAssignment.course_id == course.id)
+        ).all()
+
+        return cls(
+            id=course.id,
+            title=course.title,
+            description=course.description,
+            assigned_users=[a.user_id for a in assignments],
+            assigned_roles=list(set(a.role_name for a in assignments))
+        )
 
 class CoursesPublic(SQLModel):
     """ Helper model for returning multiple courses at once along with a `count`."""
@@ -171,7 +192,7 @@ class CourseAssignment(SQLModel, table=True):
     course_id: uuid.UUID = Field(foreign_key="course.id")
     user_id: uuid.UUID = Field(default=None, foreign_key="user.id")    
     role_name: RoleEnum = Field(
-        sa_column=Column(SAEnum(RoleEnum), unique=True, index=True), 
+        sa_column=Column(SAEnum(RoleEnum), index=True), 
         description="Enum representing possible user roles"
     )
 
