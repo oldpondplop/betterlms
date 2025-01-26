@@ -15,7 +15,8 @@
             ],
             "cwd": "${workspaceFolder}/backend",
             "jinja": true,
-            "envFile": "${workspaceFolder}/.env",
+            "envFile": "${workspaceFolder}/backend/.env",
+            "python": "${workspaceFolder}/backend/.venv/bin/python",
         },
         {
             "type": "chrome",
