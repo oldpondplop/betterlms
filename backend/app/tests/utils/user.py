@@ -4,7 +4,7 @@ from sqlmodel import Session
 from app import crud
 from app.core.config import settings
 from app.models import User, UserCreate, UserUpdate
-from app.tests.utils.utils import random_email, random_lower_string
+from app.tests.utils.utils import random_email, random_employee_id, random_lower_string, random_name, random_role
 
 
 def user_authentication_headers(
@@ -20,12 +20,18 @@ def user_authentication_headers(
 
 
 def create_random_user(db: Session) -> User:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
+    user_in = get_random_employee()
     user = crud.create_user(session=db, user_create=user_in)
     return user
 
+def get_random_employee() -> UserCreate:
+    return UserCreate(
+        email=random_email(),
+        user_id=random_employee_id(),
+        name=random_name(),
+        role_name=random_role(),
+        password=random_lower_string(12),
+    )
 
 def authentication_token_from_email(
     *, client: TestClient, email: str, db: Session
