@@ -1,9 +1,11 @@
 import uuid
+import shutil
 from typing import Any, List
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import select, func
-
 from app.api.deps import (
     SessionDep,
     CurrentUser,
@@ -24,9 +26,26 @@ from app.models import (
     UserPublic
 )
 from app import crud
-
+from app.core.config import settings
 
 router = APIRouter(prefix="/courses", tags=["courses"])
+
+
+@router.post("/upload-material/", response_model=str)
+def upload_material(admin_user: CurrentSuperUser, file: UploadFile = File(...)):
+    """Upload a single course material file and return the file path."""
+    file_path = settings.UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}" 
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return str(file_path)
+
+@router.get("/materials/{filename}")
+def get_material(admin_user: CurrentSuperUser, filename: str):
+    """Retrieve a course material by filename."""
+    file_path = settings.UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
 
 
 @router.get("/", response_model=CoursesPublic)
@@ -71,6 +90,10 @@ def create_course(
     admin_user: CurrentSuperUser
 ) -> Any:
     """Create a course with optional user/role assignment and quiz."""
+    for file_path in course_in.materials:
+        if not Path(file_path).exists():
+            raise HTTPException(status_code=400, detail=f"File not found: {file_path}")
+
     db_course = crud.create_course(session=session, course_create=course_in)
     if course_in.assigned_users or course_in.assigned_roles:
         crud.bulk_assign_course(
