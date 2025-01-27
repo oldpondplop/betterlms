@@ -130,7 +130,10 @@ async def log_request(request: Request, call_next: Callable) -> None:
         body = await request.json()
     except Exception:
         body = await request.body()
-        body = body.decode() if body else "No Body"
+        try:
+            body = body.decode("utf-8")
+        except UnicodeDecodeError:
+            body = "<Binary Data>"
 
     log_data = {
         "method": request.method,
