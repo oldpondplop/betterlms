@@ -112,7 +112,7 @@ import {
               <FormLabel htmlFor="assigned_users">Assign Users</FormLabel>
               <Select multiple {...register("assigned_users")}>
                 {users.map(user => (
-                  <option key={user.id} value={user.email}>{user.name}</option>
+                  <option key={user.id} value={user.id}>{user.name}</option>
                 ))}
               </Select>
             </FormControl>
