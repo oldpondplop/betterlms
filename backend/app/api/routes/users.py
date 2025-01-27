@@ -88,11 +88,7 @@ def update_user_me(
             raise HTTPException(
                 status_code=409, detail="User with this email already exists"
             )
-    user_data = user_in.model_dump(exclude_unset=True)
-    current_user.sqlmodel_update(user_data)
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
+    crud.update_user_me(session=session, db_user=current_user, user_in=user_in)
     return current_user
 
 
@@ -105,10 +101,8 @@ def update_password_me(
     """
     if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
-    hashed_password = get_password_hash(body.new_password)
-    current_user.hashed_password = hashed_password
-    session.add(current_user)
-    session.commit()
+    
+    crud.update_user_me(session=session, db_user=current_user, user_in=body)
     return Message(message="Password updated successfully")
 
 

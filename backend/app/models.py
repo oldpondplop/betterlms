@@ -12,6 +12,7 @@ from sqlmodel import (
     Enum as SAEnum,
     Session,
     select,
+    String
 )
 
 # =========================================================
@@ -45,12 +46,12 @@ class RoleEnum(str, Enum):
 
 class UserBase(SQLModel):
     """Base properties for Users."""
-    user_id: str = Field(unique=True, index=True, max_length=50)
-    email: EmailStr = Field(unique=True, index=True, max_length=255)
-    name: str = Field(max_length=255)
+    email: EmailStr
+    user_id: str | None =  None 
+    name: str | None = Field(default=None, max_length=255, description="Full Name")
+    role_name: RoleEnum = Field(default=RoleEnum.USER, description="User role as an enum")
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
-    role_name: RoleEnum = Field(description="User role as an enum")
 
 class UserPublic(UserBase):
     """Properties returned via API when retrieving user info."""
@@ -93,6 +94,8 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     """Database model for Users."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    email: str = Field(sa_column=Column(String, unique=True, index=True, nullable=False))
+    user_id: str | None = Field(default=None, unique=True, index=True, description="Employee id")
     hashed_password: str
     assignments: list["CourseAssignment"] = Relationship(back_populates="user")
     quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="user")

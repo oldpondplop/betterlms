@@ -1,13 +1,14 @@
 # app/crud.py
 
 import uuid
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Sequence
 
 from sqlmodel import Session, select
 from app.core.security import get_password_hash, verify_password
 from app.models import (
     CourseAssign,
     RoleEnum,
+    UpdatePassword,
     User,
     UserCreate,
     UserUpdate,
@@ -19,6 +20,7 @@ from app.models import (
     QuizCreate,
     QuizUpdate,
     QuizAttempt,
+    UserUpdateMe,
 )
 
 #
@@ -43,9 +45,12 @@ def get_user_by_email(*, session: Session, email: str) -> Optional[User]:
     """Return the user with the given email, or None if not found."""
     return session.exec(select(User).where(User.email == email)).first()
 
-def get_users_by_role(session: Session, role_name: RoleEnum) -> list[User]:
+def get_users_by_role(session: Session, role_name: RoleEnum) -> Sequence[User]:
     """Fetch all users assigned to a given role."""
     return session.exec(select(User).where(User.role_name == role_name)).all()
+
+def get_user(session: Session, user_id: uuid.UUID) -> User | None:
+    return session.get(User, user_id)
 
 def authenticate_user(*, session: Session, email: str, password: str) -> Optional[User]:
     """
@@ -58,14 +63,25 @@ def authenticate_user(*, session: Session, email: str, password: str) -> Optiona
     return db_user
 
 
+def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | UpdatePassword) -> User:
+    """Allows a user to update their own profile (name & email & password)."""
+    user_data = user_in.model_dump(exclude_unset=True)
+    if isinstance(user_in, UpdatePassword):
+        user_data["hashed_password"] = get_password_hash(user_data.pop("new_password"))
+    
+    db_user.sqlmodel_update(user_data)
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+    return db_user
+
+
 def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> User:
     """
     Partially update an existing User with the fields in UserUpdate.
     If 'password' is present, hash it and store as hashed_password.
     """
     user_data = user_in.model_dump(exclude_unset=True)
-    if "password" in user_data and user_data["password"]:
-        user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
     db_user.sqlmodel_update(user_data)
     session.add(db_user)
     session.commit()
