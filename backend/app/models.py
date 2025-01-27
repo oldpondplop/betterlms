@@ -164,21 +164,7 @@ class CoursePublic(SQLModel):
     description: str | None = None
     assigned_users: list[uuid.UUID] | None = None
     assigned_roles: list[RoleEnum] | None = None
-
-    @classmethod
-    def _from_orm(cls, course: Course, session: Session):
-        """Convert a Course ORM object to a CoursePublic response model"""
-        assignments = session.exec(
-            select(CourseAssignment).where(CourseAssignment.course_id == course.id)
-        ).all()
-
-        return cls(
-            id=course.id,
-            title=course.title,
-            description=course.description,
-            assigned_users=[a.user_id for a in assignments],
-            assigned_roles=list(set(a.role_name for a in assignments))
-        )
+    materials: list[str] | None = None
 
 class CoursesPublic(SQLModel):
     """ Helper model for returning multiple courses at once along with a `count`."""
