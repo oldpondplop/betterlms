@@ -1,11 +1,12 @@
 # app/crud.py
 
 import uuid
-from typing import List, Optional, Set, Sequence
+from typing import List, Optional, Protocol, Set, Sequence, Type, TypeVar
 
-from sqlmodel import Session, select
+from sqlmodel import SQLModel, Session, select
 from app.core.security import get_password_hash, verify_password
 from app.models import (
+    HasUUID,
     CourseAssign,
     RoleEnum,
     UpdatePassword,
@@ -23,10 +24,14 @@ from app.models import (
     UserUpdateMe,
 )
 
+T = TypeVar("T", bound=HasUUID)
+def get_by_uuid(db: Session, model: type[T], id: str | uuid.UUID) -> Optional[T]:
+    """Fetch a record by UUID, converting string UUIDs."""
+    return db.exec(select(model).where(model.id == uuid.UUID(str(id)))).first()
+
 #
 # =========  User CRUD  =========
 #
-
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:
     """
@@ -62,7 +67,6 @@ def authenticate_user(*, session: Session, email: str, password: str) -> Optiona
         return None
     return db_user
 
-
 def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | UpdatePassword) -> User:
     """Allows a user to update their own profile (name & email & password)."""
     user_data = user_in.model_dump(exclude_unset=True)
@@ -74,7 +78,6 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
     session.commit()
     session.refresh(db_user)
     return db_user
-
 
 def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> User:
     """
@@ -88,51 +91,9 @@ def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> User
     session.refresh(db_user)
     return db_user
 
-
 #
 # =========  Course CRUD  =========
 #
-
-# def create_course(session: Session, course_data: CourseCreate) -> Course:
-#     """
-#     Creates a course with optional user/role assignments and quiz creation.
-#     """
-#     # ✅ Step 1: Create the Course
-#     db_course = Course.model_validate(course_data)
-#     session.add(db_course)
-#     session.commit()
-#     session.refresh(db_course)
-
-#     # ✅ Step 2: Assign Users & Roles (if provided)
-#     if course_data.assigned_users or course_data.assigned_roles:
-#         user_ids = session.exec(
-#             select(User.id).where(User.email.in_(course_data.assigned_user_emails))
-#         ).all()
-
-#         assignments = [
-#             CourseAssignment(course_id=db_course.id, user_id=user_id)
-#             for user_id in user_ids
-#         ] + [
-#             CourseAssignment(course_id=db_course.id, role_name=role)
-#             for role in course_data.assigned_role_names
-#         ]
-
-#         session.add_all(assignments)
-
-#     # ✅ Step 3: Create Quiz (if requested)
-#     if course_data.create_quiz:
-#         new_quiz = Quiz(course_id=db_course.id, questions=[])
-#         session.add(new_quiz)
-#         session.commit()
-#         session.refresh(new_quiz)
-#         db_course.quiz_id = new_quiz.id
-#         session.add(db_course)
-
-#     session.commit()
-#     return db_course
-
-
-
 
 def create_course(*, session: Session, course_create: CourseCreate) -> Course:
     """
@@ -144,7 +105,6 @@ def create_course(*, session: Session, course_create: CourseCreate) -> Course:
     session.commit()
     session.refresh(db_course)
     return db_course
-
 
 def update_course(
     *, session: Session, db_course: Course, course_in: CourseUpdate
@@ -158,11 +118,9 @@ def update_course(
     session.refresh(db_course)
     return db_course
 
-
 #
 # =========  Assignments  =========
 #
-
 
 def assign_course_to_user(
     *, session: Session, course_id: uuid.UUID, user_id: uuid.UUID
@@ -176,7 +134,6 @@ def assign_course_to_user(
     session.commit()
     session.refresh(assignment)
     return assignment
-
 
 def assign_course_to_role(
     *, session: Session, course_id: uuid.UUID, role: RoleEnum
@@ -225,23 +182,9 @@ def bulk_assign_course(*, session: Session, course_id: uuid.UUID, user_ids: list
     session.add_all(new_assignments)
     session.commit()
 
-# def reassign_course(
-#     *,
-#     session: Session,
-#     course_id: uuid.UUID,
-#     user_ids: List[uuid.UUID] = [],
-#     roles: List[Role] = []
-# ) -> None:
-#     """**Reassigns a course** to a new set of users and roles."""
-#     # Remove existing assignments
-#     session.exec(select(CourseAssignment).where(CourseAssignment.course_id == course_id)).delete()
-
-#     # Assign new users & roles
-#     bulk_assign_course(session=session, course_id=course_id, user_ids=user_ids, roles=roles)
 #
 # =========  Quiz CRUD  =========
 #
-
 
 def create_quiz(*, session: Session, quiz_create: QuizCreate) -> Quiz:
     """
@@ -253,7 +196,6 @@ def create_quiz(*, session: Session, quiz_create: QuizCreate) -> Quiz:
     session.commit()
     session.refresh(db_quiz)
     return db_quiz
-
 
 def update_quiz(*, session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
     """
@@ -268,11 +210,9 @@ def update_quiz(*, session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz
     session.refresh(db_quiz)
     return db_quiz
 
-
 #
 # =========  Quiz Attempts  =========
 #
-
 
 def record_quiz_attempt(
     *,

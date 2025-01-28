@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Protocol
 import uuid
 from datetime import datetime, date
 from enum import Enum
@@ -14,6 +14,10 @@ from sqlmodel import (
     select,
     String
 )
+
+class HasUUID(Protocol): 
+    """Used to convert id to uuid for get db queries."""
+    id: uuid.UUID 
 
 # =========================================================
 #  Role Models
@@ -154,8 +158,8 @@ class CourseUpdate(SQLModel):
     is_active: Optional[bool] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    assigned_user_emails: Optional[EmailStr] = None
-    assigned_role_names: Optional[RoleEnum] = None
+    assigned_users: Optional[uuid.UUID] = None
+    assigned_roles: Optional[RoleEnum] = None
     
 class CoursePublic(SQLModel):
     """Public response model including assigned users and roles"""
