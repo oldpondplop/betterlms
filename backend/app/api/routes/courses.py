@@ -1,9 +1,11 @@
 import uuid
+import shutil
 from typing import Any, List
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import select, func
-
 from app.api.deps import (
     SessionDep,
     CurrentUser,
@@ -24,9 +26,26 @@ from app.models import (
     UserPublic
 )
 from app import crud
-
+from app.core.config import settings
 
 router = APIRouter(prefix="/courses", tags=["courses"])
+
+
+@router.post("/upload-material/", response_model=str)
+def upload_material(admin_user: CurrentSuperUser, file: UploadFile = File(...)):
+    """Upload a single course material file and return the file path."""
+    file_path = settings.UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}" 
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return str(file_path)
+
+@router.get("/materials/{filename}")
+def get_material(admin_user: CurrentSuperUser, filename: str):
+    """Retrieve a course material by filename."""
+    file_path = settings.UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(str(file_path), headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @router.get("/", response_model=CoursesPublic)
@@ -51,11 +70,11 @@ def read_courses(
 
     public_courses = [
         CoursePublic(
-            id=course.id,
+            id=str(course.id),  # Make sure ID is converted to string
             title=course.title,
             description=course.description,
-            assigned_users=[a.user_id for a in course.assignments],
-            assigned_roles=list(set(a.role_name for a in course.assignments))  
+            assigned_users=[str(a.user_id) for a in course.assignments],  # Convert UUIDs to strings
+            assigned_roles=list(set(a.role_name for a in course.assignments))
         )
         for course in courses
     ]
@@ -71,6 +90,10 @@ def create_course(
     admin_user: CurrentSuperUser
 ) -> Any:
     """Create a course with optional user/role assignment and quiz."""
+    for file_path in course_in.materials:
+        if not Path(file_path).exists():
+            raise HTTPException(status_code=400, detail=f"File not found: {file_path}")
+
     db_course = crud.create_course(session=session, course_create=course_in)
     if course_in.assigned_users or course_in.assigned_roles:
         crud.bulk_assign_course(
@@ -120,21 +143,30 @@ def read_course_by_id(
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    if current_user.is_superuser:
-        return db_course
+    # Extract assigned users and roles directly from the relationship
+    assigned_users = [str(assignment.user_id) for assignment in db_course.assignments]
+    assigned_roles = [assignment.role_name for assignment in db_course.assignments]
 
-    # Check if user is assigned to this course
-    statement = (
-        select(CourseAssignment)
-        .where(
-            CourseAssignment.course_id == db_course.id,
-            CourseAssignment.user_id == current_user.id
+    # If user is an admin, return full details
+    if current_user.is_superuser:
+        return CoursePublic(
+            id=db_course.id,
+            title=db_course.title,
+            assigned_users=assigned_users,
+            assigned_roles=assigned_roles
         )
-    )
-    assignment = session.exec(statement).first()
-    if not assignment:
+
+    # Check if the current user is assigned to the course
+    if current_user.id not in assigned_users:
         raise HTTPException(status_code=403, detail="You are not assigned to this course")
-    return db_course
+
+    # Return course details with assigned users and roles
+    return CoursePublic(
+        id=db_course.id,
+        assigned_users=assigned_users,
+        assigned_roles=assigned_roles
+    )
+
 
 @router.patch("/{course_id}", response_model=CoursePublic)
 def update_course(
@@ -156,7 +188,16 @@ def update_course(
         db_course=db_course,
         course_in=course_in
     )
+    if course_in.assigned_users or course_in.assigned_roles:
+        crud.bulk_assign_course(
+            session=session, 
+            course_id=db_course.id, 
+            user_ids=course_in.assigned_users, 
+            roles=course_in.assigned_roles
+        )
+    
     return updated_course
+
 
 @router.delete("/{course_id}", response_model=Message)
 def delete_course(

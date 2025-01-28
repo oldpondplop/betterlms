@@ -6,7 +6,7 @@ from app import crud
 engine = create_engine(
     str(settings.SQLALCHEMY_DATABASE_URI),
     connect_args={"check_same_thread": False}, 
-    echo=True
+    echo=False
 )
 
 def init_db(session: Session| None = None) -> None:

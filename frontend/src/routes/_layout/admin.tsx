@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Container,
   Flex,
   Heading,
@@ -12,44 +13,43 @@ import {
   Th,
   Thead,
   Tr,
-} from "@chakra-ui/react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useEffect } from "react"
-import { z } from "zod"
+} from "@chakra-ui/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { z } from "zod";
 
-import { type UserPublic, UsersService } from "../../client"
-import AddUser from "../../components/Admin/AddUser"
-import ActionsMenu from "../../components/Common/ActionsMenu"
-import Navbar from "../../components/Common/Navbar"
-import { PaginationFooter } from "../../components/Common/PaginationFooter"
+import { type UserPublic, UsersService } from "../../client";
+import ActionsMenu from "../../components/Common/ActionsMenu";
+import { PaginationFooter } from "../../components/Common/PaginationFooter";
+import AddUser from "../../components/Admin/AddUser";
 
 const usersSearchSchema = z.object({
   page: z.number().catch(1),
-})
+});
 
 export const Route = createFileRoute("/_layout/admin")({
   component: Admin,
   validateSearch: (search) => usersSearchSchema.parse(search),
-})
+});
 
-const PER_PAGE = 5
+const PER_PAGE = 5;
 
 function getUsersQueryOptions({ page }: { page: number }) {
   return {
     queryFn: () =>
       UsersService.readUsers({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
     queryKey: ["users", { page }],
-  }
+  };
 }
 
 function UsersTable() {
-  const queryClient = useQueryClient()
-  const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
-  const { page } = Route.useSearch()
-  const navigate = useNavigate({ from: Route.fullPath })
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"]);
+  const { page } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const setPage = (page: number) =>
-    navigate({ search: (prev: { [key: string]: string }) => ({ ...prev, page }) })
+    navigate({ search: (prev: { [key: string]: string }) => ({ ...prev, page }) });
 
   const {
     data: users,
@@ -58,23 +58,23 @@ function UsersTable() {
   } = useQuery({
     ...getUsersQueryOptions({ page }),
     placeholderData: (prevData) => prevData,
-  })
+  });
 
-  const hasNextPage = !isPlaceholderData && users?.data.length === PER_PAGE
-  const hasPreviousPage = page > 1
+  const hasNextPage = !isPlaceholderData && users?.data.length === PER_PAGE;
+  const hasPreviousPage = page > 1;
 
   useEffect(() => {
     if (hasNextPage) {
-      queryClient.prefetchQuery(getUsersQueryOptions({ page: page + 1 }))
+      queryClient.prefetchQuery(getUsersQueryOptions({ page: page + 1 }));
     }
-  }, [page, queryClient, hasNextPage])
+  }, [page, queryClient, hasNextPage]);
 
   return (
     <TableContainer>
       <Table size={{ base: "sm", md: "md" }}>
         <Thead>
           <Tr>
-            <Th width="15%">User ID</Th>
+            <Th width="15%">Employee ID</Th>
             <Th width="20%">Full Name</Th>
             <Th width="30%">Email</Th>
             <Th width="10%">Role</Th>
@@ -102,7 +102,7 @@ function UsersTable() {
                   )}
                 </Td>
                 <Td isTruncated maxWidth="200px">{user.email}</Td>
-                <Td>{user.is_superuser ? "Superuser" : user.role_name.charAt(0).toUpperCase() + user.role_name.slice(1)}</Td>
+                <Td>{user.is_superuser ? "Superuser" : (user.role_name ? user.role_name.charAt(0).toUpperCase() + user.role_name.slice(1) : "N/A")}</Td>
                 <Td>
                   <Flex gap={2}>
                     <Box w="2" h="2" borderRadius="50%" bg={user.is_active ? "ui.success" : "ui.danger"} alignSelf="center" />
@@ -119,21 +119,29 @@ function UsersTable() {
       </Table>
       <PaginationFooter onChangePage={setPage} page={page} hasNextPage={hasNextPage} hasPreviousPage={hasPreviousPage} />
     </TableContainer>
-  )
+  );
 }
 
-
 function Admin() {
+  const [isModalOpen, setModalOpen] = useState(false);
+
   return (
     <Container maxW="full">
       <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
         Users Management
       </Heading>
 
-      <Navbar type={"User"} addModalAs={AddUser} />
+      {/* Add User Button */}
+      <Button onClick={() => setModalOpen(true)} colorScheme="teal" mb={4}>
+        Add User
+      </Button>
+
+      {/* AddUser Modal */}
+      <AddUser isOpen={isModalOpen} onClose={() => setModalOpen(false)} />
+
       <UsersTable />
     </Container>
-  )
+  );
 }
 
-export default Admin
+export default Admin;

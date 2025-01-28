@@ -116,7 +116,7 @@ class CourseBase(SQLModel):
 class Course(CourseBase, table=True):
     """Database model for Course"""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    
+   
     quiz: Optional['Quiz'] = Relationship(back_populates="course")    
     assignments: list["CourseAssignment"] = Relationship(back_populates="course")
     
@@ -154,31 +154,15 @@ class CourseUpdate(SQLModel):
     is_active: Optional[bool] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    assigned_user_emails: Optional[EmailStr] = None
-    assigned_role_names: Optional[RoleEnum] = None
+    assigned_users: Optional[list[uuid.UUID]] = None
+    assigned_roles: Optional[list[RoleEnum]] = None
     
-class CoursePublic(SQLModel):
+class CoursePublic(CourseBase):
     """Public response model including assigned users and roles"""
     id: uuid.UUID
-    title: str
-    description: str | None = None
-    assigned_users: list[uuid.UUID] | None = None
+    assigned_users: list[str] | None = None  # Changed to list[str]
     assigned_roles: list[RoleEnum] | None = None
 
-    @classmethod
-    def _from_orm(cls, course: Course, session: Session):
-        """Convert a Course ORM object to a CoursePublic response model"""
-        assignments = session.exec(
-            select(CourseAssignment).where(CourseAssignment.course_id == course.id)
-        ).all()
-
-        return cls(
-            id=course.id,
-            title=course.title,
-            description=course.description,
-            assigned_users=[a.user_id for a in assignments],
-            assigned_roles=list(set(a.role_name for a in assignments))
-        )
 
 class CoursesPublic(SQLModel):
     """ Helper model for returning multiple courses at once along with a `count`."""

@@ -22,6 +22,7 @@ import { RoleEnum, type UserCreate, UsersService } from "../../client"
 import type { ApiError } from "../../client/core/ApiError"
 import useCustomToast from "../../hooks/useCustomToast"
 import { emailPattern, handleError } from "../../utils"
+import React from "react"
 
 
 interface AddUserProps {

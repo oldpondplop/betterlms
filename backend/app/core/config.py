@@ -5,17 +5,16 @@ from pathlib import Path
 from pydantic import (
     AnyUrl,
     BeforeValidator,
+    Field,
     computed_field,
+    field_validator,
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
 
-BASE_DIR = Path(__file__).resolve().parents[3]
-ENV_FILE = BASE_DIR / "backend" / ".env"
-# print(f"{BASE_DIR=}")
-# print(f"{ENV_FILE=}")
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 def parse_cors(v: Any) -> list[str] | str:
     if isinstance(v, str) and not v.startswith("["):
@@ -27,7 +26,7 @@ def parse_cors(v: Any) -> list[str] | str:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE),
+        env_file=str(BASE_DIR / ".env"),
         env_ignore_empty=True,
         extra="ignore",
     )
@@ -48,8 +47,26 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str
     
-    SQLALCHEMY_DATABASE_URI: str = f"sqlite:///{BASE_DIR / 'backend' / 'data' / 'app.db'}"
-    
+    # Paths
+    UPLOAD_DIR: Path = Field(default="data/course/materials")
+    SQLALCHEMY_DATABASE_URI: str = Field(default="sqlite:///data/app.db")
+    @field_validator("UPLOAD_DIR", mode="before")
+    @classmethod
+    def resolve_upload_dir(cls, v: str | Path) -> Path:
+        path = (BASE_DIR / Path(v)).resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @field_validator("SQLALCHEMY_DATABASE_URI", mode="before")
+    @classmethod
+    def resolve_database_url(cls, v: str) -> str:
+        """Ensure SQLALCHEMY_DATABASE_URI uses an absolute path if it's SQLite."""
+        if v.startswith("sqlite:///"):
+            db_path = (BASE_DIR / Path(v.replace("sqlite:///", ""))).resolve()
+            db_path.parent.mkdir(parents=True, exist_ok=True) 
+            return f"sqlite:///{db_path}"
+        return v 
+
     SMTP_TLS: bool = True
     SMTP_SSL: bool = False
     SMTP_PORT: int = 587
@@ -78,6 +95,7 @@ class Settings(BaseSettings):
     # TODO: update type to EmailStr when sqlmodel supports it
     FIRST_SUPERUSER: str
     FIRST_SUPERUSER_PASSWORD: str
+
 
 settings = Settings()  # type: ignore
 
