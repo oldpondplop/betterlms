@@ -23,6 +23,11 @@ class HasUUID(Protocol):
 #  Role Models
 # =========================================================
 
+class CourseStatus(str, Enum):
+    ASSIGNED = "assigned"
+    COMPLETED = "completed"
+    MAX_ATTEMPTS_REACHED = "max_attempts_reached"
+
 class RoleEnum(str, Enum):
     """Enum representing possible user roles."""
     ADMIN = "admin"
@@ -51,9 +56,9 @@ class RoleEnum(str, Enum):
 class UserBase(SQLModel):
     """Base properties for Users."""
     email: EmailStr
-    user_id: str | None =  None 
-    name: str | None = Field(default=None, max_length=255, description="Full Name")
-    role_name: RoleEnum = Field(default=RoleEnum.USER, description="User role as an enum")
+    user_id: Optional[str] = Field(default=None, max_length=255, description="Employee id")
+    name: Optional[str] = Field(default=None, max_length=255, description="Full Name")
+    role: RoleEnum = Field(default=RoleEnum.USER, description="User role as an enum")
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
 
@@ -70,25 +75,18 @@ class UserCreate(UserBase):
     """Properties used when creating a new user through the API."""
     password: str = Field(min_length=8, max_length=40)
 
-# TODO: Probably not needed
-class UserRegister(SQLModel):
-    """Properties used for self-registration or public sign-up."""
-    email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=40)
-    name: str | None = Field(default=None, max_length=255)
-
 class UserUpdate(SQLModel):
     """Schema for updating an existing user. All fields optional."""
-    name: str | None = None
-    email: EmailStr | None = None
-    is_active: bool | None = None
-    is_superuser: bool | None = None
-    role_name: RoleEnum | None = None 
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[RoleEnum] = None
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
 
 class UserUpdateMe(SQLModel):
     """Allows the logged-in user to update their own profile."""
-    name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
+    name: Optional[str]  = Field(default=None, max_length=255)
+    email: Optional[str] = Field(default=None, max_length=255)
 
 class UpdatePassword(SQLModel):
     """Model for changing passwords."""
@@ -99,10 +97,20 @@ class User(UserBase, table=True):
     """Database model for Users."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(sa_column=Column(String, unique=True, index=True, nullable=False))
-    user_id: str | None = Field(default=None, unique=True, index=True, description="Employee id")
     hashed_password: str
+    user_id: Optional[str] = Field(default=None, unique=True, index=True, description="Employee id")
+    role: RoleEnum = Field(
+        default=RoleEnum.USER,
+        sa_column=Column(SAEnum(RoleEnum), nullable=False),
+        description="User role as an enum"
+    )
     assignments: list["CourseAssignment"] = Relationship(back_populates="user")
     quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="user")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    )
 
 # =========================================================
 #  Course Models
@@ -143,8 +151,8 @@ class CourseCreate(SQLModel):
 
 class CourseAssign(SQLModel):
     """Schema for assigning users and roles to a course."""
-    assigned_user_emails: list[EmailStr] = []
-    assigned_role_names: list[RoleEnum] = []
+    assigned_users: list[EmailStr] = []
+    assigned_roles: list[RoleEnum] = []
 
 class AttachQuizToCourse(SQLModel):
     """Schema for attaching an existing quiz to a course."""
@@ -184,7 +192,7 @@ class CourseAssignment(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     course_id: uuid.UUID = Field(foreign_key="course.id")
     user_id: uuid.UUID = Field(default=None, foreign_key="user.id")    
-    role_name: RoleEnum = Field(
+    role: RoleEnum = Field(
         sa_column=Column(SAEnum(RoleEnum), index=True), 
         description="Enum representing possible user roles"
     )
