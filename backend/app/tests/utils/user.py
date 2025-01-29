@@ -1,11 +1,35 @@
+from enum import Enum
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app import crud
 from app.core.config import settings
-from app.models import User, UserCreate, UserUpdate
+from app.models import RoleCreate, User, UserCreate, UserUpdate
 from app.tests.utils.utils import random_email, random_employee_id, random_lower_string, random_name, random_role
 
+class RoleEnum(str, Enum):
+    """Enum representing possible user roles."""
+    ADMIN = "admin"
+    USER = "user"
+    INFIRMIERA = "infirmiera"
+    OFICIANTA = "oficianta"
+    BRANCARDIER = "brancardier"
+    ASISTENT_MEDICAL = "asistent medical"
+    FEMEIE_DE_SERVICIU = "femeie de serviciu"
+    MASAJ = "masaj"
+    KINETOTERAPIE = "kinetoterapie"
+    RECEPTIE = "receptie"
+    CONTABILITATE = "contabilitate"
+    INFORMATICA = "informatica"
+    RESURSE_UMANE = "resurse umane"
+    EPIDEMIOLOG = "epidemiolog"
+    MANAGEMENTUL_CALITATII = "managementul calitatii"
+    FARMACIST = "farmacist"
+    BIROU_INTERNARI_EXTERNARI = "birou internari/externari"
+
+def create_roles(db: Session):
+    for role_name in RoleEnum:
+        crud.create_role(db, role_in=RoleCreate(name=role_name))
 
 def user_authentication_headers(
     *, client: TestClient, email: str, password: str
