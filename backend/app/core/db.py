@@ -21,13 +21,13 @@ def init_db(session: Session| None = None) -> None:
         admin_in = UserCreate(
             user_id="ADMIN001",
             name="Admin",
-            role_name="admin",
+            role_id=None,
             email=settings.FIRST_SUPERUSER,
             password=settings.FIRST_SUPERUSER_PASSWORD,
             is_superuser=True,
             is_active=True,
         )
-        admin = crud.create_user(session=session, user_create=admin_in)
+        admin = crud.create_user(session=session, user_in=admin_in)
 
     session.commit()  
     print("✅ Database initialized successfully!")

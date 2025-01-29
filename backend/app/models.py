@@ -76,7 +76,7 @@ class Role(RoleBase, table=True):
 
 class UserBase(SQLModel):
     name: str
-    email: EmailStr
+    email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = True
     is_superuser: bool = False
     # NOTE: maybe this should be uniqe?
@@ -84,11 +84,11 @@ class UserBase(SQLModel):
 
 class UserCreate(UserBase):
     password: str
-    role_id: uuid.UUID
+    role_id: uuid.UUID | None
 
 class UserPublic(UserBase):
     id: uuid.UUID
-    role_id: uuid.UUID
+    role_id: uuid.UUID | None = None
 
 class UsersPublic(SQLModel):
     data: List[UserPublic]
@@ -115,7 +115,7 @@ class User(UserBase, table=True):
     hashed_password: str
     
     # Single role per user
-    role_id: uuid.UUID = Field(foreign_key="role.id")
+    role_id: Optional[uuid.UUID] = Field(foreign_key="role.id", nullable=True)
     role: Optional[Role] = Relationship(back_populates="users")
 
     # Many-to-many with Courses (through CourseUserLink)

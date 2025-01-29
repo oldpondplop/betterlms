@@ -1,5 +1,5 @@
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -7,7 +7,7 @@ from app import crud
 from app.core.config import settings
 from app.core.security import verify_password
 from app.utils import generate_new_account_email, send_email
-from app.api.deps import CurrentUser, CurrentSuperUser, SessionDep
+from app.api.deps import CurrentUser, CurrentSuperUser, SessionDep, SuperuserRequired
 from app.models import (
     Message,
     UpdatePassword,
@@ -21,21 +21,19 @@ from app.models import (
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-
-@router.get("/", response_model=UsersPublic, dependencies=[Depends(CurrentSuperUser)])
+@router.get("/", response_model=UsersPublic, dependencies=[SuperuserRequired])
 def get_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
-    return UsersPublic(
-        data=crud.count_users(session), 
-        count=crud.get_users(session, skip=skip, limit=limit)
-    )
+    count = crud.count_users(session)
+    data = crud.get_users(session, skip=skip, limit=limit)
+    return UsersPublic(data=data, count=count)
 
-@router.get("/{user_id}", response_model=UserPublic)
-def read_user_by_id(user_id: uuid.UUID, session: SessionDep, admin_user: CurrentSuperUser) -> Any:
+@router.get("/{user_id}", response_model=UserPublic, dependencies=[SuperuserRequired])
+def read_user_by_id(user_id: uuid.UUID, session: SessionDep) -> Any:
     if user := session.get(User, user_id):
         return user
     raise HTTPException(status_code=404, detail="User not found")
 
-@router.post("/", response_model=UserPublic, dependencies=[Depends(CurrentSuperUser)])
+@router.post("/", response_model=UserPublic, dependencies=[SuperuserRequired])
 def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
     if (user:=crud.get_user_by_email(session=session, email=user_in.email)):
         raise HTTPException(status_code=400, detail="The user with this email already exists in the system.")
@@ -72,8 +70,8 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     session.commit()
     return Message(message="User deleted successfully")
 
-@router.patch("/{user_id}", response_model=UserPublic)
-def update_user(*, session: SessionDep, user_id: uuid.UUID, user_in: UserUpdate,) -> Any:
+@router.patch("/{user_id}", response_model=UserPublic, dependencies=[SuperuserRequired])
+def update_user(*, session: SessionDep, user_id: uuid.UUID, user_in: UserUpdate) -> Any:
     if not (db_user:=session.get(User, user_id)): 
         raise HTTPException(status_code=404, detail="User not found")
     if user_in.email:
@@ -83,7 +81,7 @@ def update_user(*, session: SessionDep, user_id: uuid.UUID, user_in: UserUpdate,
     db_user = crud.update_user(session=session, db_user=db_user, user_in=user_in)
     return db_user
 
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", dependencies=[SuperuserRequired])
 def delete_user(session: SessionDep, current_user: CurrentSuperUser, user_id: uuid.UUID) -> Message:
     if not (user := session.get(User, user_id)):
         raise HTTPException(status_code=404, detail="User not found")
