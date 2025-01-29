@@ -1,7 +1,5 @@
 import {
   Button,
-  Checkbox,
-  Flex,
   FormControl,
   FormErrorMessage,
   FormLabel,
@@ -13,20 +11,19 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Select,
+  Switch,
+  VStack,
 } from "@chakra-ui/react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
-
 import {
   type ApiError,
   type UserPublic,
   type UserUpdate,
-  RoleEnum,
   UsersService,
 } from "../../client"
 import useCustomToast from "../../hooks/useCustomToast"
-import { emailPattern, handleError } from "../../utils"
+import { handleError } from "../../utils"
 
 interface EditUserProps {
   user: UserPublic
@@ -42,23 +39,23 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { isSubmitting, errors, isDirty },
   } = useForm<UserUpdate>({
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
-      user_id: user.user_id, 
       name: user.name,
       email: user.email,
-      role_name: user.role_name || undefined,
-      is_superuser: user.is_superuser,
+      user_id: user.user_id || "",
       is_active: user.is_active,
+      is_superuser: user.is_superuser,
+      role_id: user.role_id,
     },
   })
 
   const mutation = useMutation({
     mutationFn: (data: UserUpdate) =>
-      UsersService.updateUser({ userId: user.id, requestBody: data }), 
+      UsersService.updateUser({ userId: user.id, requestBody: data }),
     onSuccess: () => {
       showToast("Success!", "User updated successfully.", "success")
       onClose()
@@ -80,80 +77,105 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
     onClose()
   }
 
+  const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
+  const isCurrentUser = currentUser?.id === user.id
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md" isCentered>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size={{ base: "sm", md: "md" }}
+      isCentered
+    >
       <ModalOverlay />
       <ModalContent as="form" onSubmit={handleSubmit(onSubmit)}>
         <ModalHeader>Edit User</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
-          {/* Editable User ID (admin-defined, not UUID) */}
-          <FormControl isRequired isInvalid={!!errors.user_id}>
-            <FormLabel htmlFor="user_id">User ID</FormLabel>
-            <Input
-              id="user_id"
-              {...register("user_id", { required: "User ID is required" })}
-              placeholder="Enter User ID"
-              type="text"
-            />
-            {errors.user_id && <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>}
-          </FormControl>
-
-          {/* Full Name */}
-          <FormControl mt={4} isRequired isInvalid={!!errors.name}>
-            <FormLabel htmlFor="name">Full Name</FormLabel>
-            <Input
-              id="name"
-              {...register("name", { required: "Full name is required" })}
-              type="text"
-            />
-            {errors.name && <FormErrorMessage>{errors.name.message}</FormErrorMessage>}
-          </FormControl>
-
-          {/* Email */}
-          <FormControl mt={4} isRequired isInvalid={!!errors.email}>
-            <FormLabel htmlFor="email">Email</FormLabel>
-            <Input
-              id="email"
-              {...register("email", {
-                required: "Email is required",
-                pattern: emailPattern,
-              })}
-              type="email"
-            />
-            {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
-          </FormControl>
-          
-          {/* Role */}
-          <FormControl mt={4} isRequired isInvalid={!!errors.role_name}>
-            <FormLabel htmlFor="role_name">Role</FormLabel>
-              <Select id="role_name" {...register("role_name", { required: "Role is required" })}>
-                {Object.entries(RoleEnum).map(([key, role]) => (
-                  <option key={key} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            {errors.role_name && <FormErrorMessage>{errors.role_name.message}</FormErrorMessage>}
-          </FormControl>
-
-          {/* Checkboxes for Superuser & Active Status */}
-          <Flex mt={4}>
-            <FormControl>
-              <Checkbox {...register("is_superuser")} colorScheme="teal">
-                Is Superuser?
-              </Checkbox>
+          <VStack spacing={4} align="stretch">
+            <FormControl isInvalid={!!errors.name}>
+              <FormLabel htmlFor="name">Full Name</FormLabel>
+              <Input
+                id="name"
+                {...register("name", {
+                  required: "Name is required",
+                })}
+                type="text"
+              />
+              {errors.name && (
+                <FormErrorMessage>{errors.name.message}</FormErrorMessage>
+              )}
             </FormControl>
-            <FormControl>
-              <Checkbox {...register("is_active")} colorScheme="teal">
-                Is Active?
-              </Checkbox>
+
+            <FormControl isInvalid={!!errors.email}>
+              <FormLabel htmlFor="email">Email</FormLabel>
+              <Input
+                id="email"
+                {...register("email", {
+                  required: "Email is required",
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: "Invalid email address",
+                  },
+                })}
+                type="email"
+              />
+              {errors.email && (
+                <FormErrorMessage>{errors.email.message}</FormErrorMessage>
+              )}
             </FormControl>
-          </Flex>
+
+            <FormControl>
+              <FormLabel htmlFor="user_id">Employee ID</FormLabel>
+              <Input
+                id="user_id"
+                {...register("user_id", {
+                  maxLength: {
+                    value: 30,
+                    message: "Employee ID cannot exceed 30 characters",
+                  },
+                })}
+                type="text"
+              />
+              {errors.user_id && (
+                <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>
+              )}
+            </FormControl>
+
+            {!isCurrentUser && (
+              <>
+                <FormControl display="flex" alignItems="center">
+                  <FormLabel htmlFor="is_active" mb="0">
+                    Active Status
+                  </FormLabel>
+                  <Switch
+                    id="is_active"
+                    {...register("is_active")}
+                  />
+                </FormControl>
+
+                <FormControl display="flex" alignItems="center">
+                  <FormLabel htmlFor="is_superuser" mb="0">
+                    Superuser Status
+                  </FormLabel>
+                  <Switch
+                    id="is_superuser"
+                    {...register("is_superuser")}
+                    isDisabled={isCurrentUser}
+                  />
+                </FormControl>
+              </>
+            )}
+          </VStack>
         </ModalBody>
 
         <ModalFooter gap={3}>
-          <Button variant="primary" type="submit" isLoading={isSubmitting} isDisabled={!isDirty}>
+          <Button
+            variant="primary"
+            type="submit"
+            isLoading={isSubmitting}
+            isDisabled={!isDirty}
+          >
             Save
           </Button>
           <Button onClick={onCancel}>Cancel</Button>

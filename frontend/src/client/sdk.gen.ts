@@ -4,32 +4,18 @@ import type { CancelablePromise } from "./core/CancelablePromise"
 import { OpenAPI } from "./core/OpenAPI"
 import { request as __request } from "./core/request"
 import type {
-  CoursesUploadMaterialData,
-  CoursesUploadMaterialResponse,
-  CoursesGetMaterialData,
-  CoursesGetMaterialResponse,
-  CoursesReadCoursesData,
-  CoursesReadCoursesResponse,
   CoursesCreateCourseData,
   CoursesCreateCourseResponse,
-  CoursesReadCourseByIdData,
-  CoursesReadCourseByIdResponse,
+  CoursesReadCoursesData,
+  CoursesReadCoursesResponse,
+  CoursesReadCourseData,
+  CoursesReadCourseResponse,
   CoursesUpdateCourseData,
   CoursesUpdateCourseResponse,
   CoursesDeleteCourseData,
   CoursesDeleteCourseResponse,
-  CoursesBulkAssignCourseData,
-  CoursesBulkAssignCourseResponse,
-  CoursesAssignUserToCourseData,
-  CoursesAssignUserToCourseResponse,
-  CoursesGetAssignedCoursesForUserData,
-  CoursesGetAssignedCoursesForUserResponse,
-  CoursesGetAssignedUsersForCourseData,
-  CoursesGetAssignedUsersForCourseResponse,
   CoursesAttachQuizToCourseData,
   CoursesAttachQuizToCourseResponse,
-  CoursesGetCourseDetailsData,
-  CoursesGetCourseDetailsResponse,
   LoginLoginAccessTokenData,
   LoginLoginAccessTokenResponse,
   LoginTestTokenResponse,
@@ -41,18 +27,16 @@ import type {
   LoginRecoverPasswordHtmlContentResponse,
   PrivateCreateUserData,
   PrivateCreateUserResponse,
-  UsersReadUsersData,
-  UsersReadUsersResponse,
-  UsersCreateUserData,
-  UsersCreateUserResponse,
   UsersReadUserMeResponse,
   UsersDeleteUserMeResponse,
   UsersUpdateUserMeData,
   UsersUpdateUserMeResponse,
   UsersUpdatePasswordMeData,
   UsersUpdatePasswordMeResponse,
-  UsersRegisterUserData,
-  UsersRegisterUserResponse,
+  UsersReadUsersData,
+  UsersReadUsersResponse,
+  UsersCreateUserData,
+  UsersCreateUserResponse,
   UsersReadUserByIdData,
   UsersReadUserByIdResponse,
   UsersUpdateUserData,
@@ -63,44 +47,21 @@ import type {
 
 export class CoursesService {
   /**
-   * Upload Material
-   * Upload a single course material file and return the file path.
+   * Create Course
+   * Create a new course. Only accessible by superusers.
    * @param data The data for the request.
-   * @param data.formData
-   * @returns string Successful Response
+   * @param data.requestBody
+   * @returns CoursePublic Successful Response
    * @throws ApiError
    */
-  public static uploadMaterial(
-    data: CoursesUploadMaterialData,
-  ): CancelablePromise<CoursesUploadMaterialResponse> {
+  public static createCourse(
+    data: CoursesCreateCourseData,
+  ): CancelablePromise<CoursesCreateCourseResponse> {
     return __request(OpenAPI, {
       method: "POST",
-      url: "/api/v1/courses/upload-material/",
-      formData: data.formData,
-      mediaType: "multipart/form-data",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Get Material
-   * Retrieve a course material by filename.
-   * @param data The data for the request.
-   * @param data.filename
-   * @returns unknown Successful Response
-   * @throws ApiError
-   */
-  public static getMaterial(
-    data: CoursesGetMaterialData,
-  ): CancelablePromise<CoursesGetMaterialResponse> {
-    return __request(OpenAPI, {
-      method: "GET",
-      url: "/api/v1/courses/materials/{filename}",
-      path: {
-        filename: data.filename,
-      },
+      url: "/api/v1/courses/",
+      body: data.requestBody,
+      mediaType: "application/json",
       errors: {
         422: "Validation Error",
       },
@@ -109,13 +70,11 @@ export class CoursesService {
 
   /**
    * Read Courses
-   * Retrieve courses.
-   * - If current_user is superuser, return all courses.
-   * - Otherwise, return only courses assigned to current_user.
+   * Retrieve a list of courses. Accessible by any authenticated user.
    * @param data The data for the request.
    * @param data.skip
    * @param data.limit
-   * @returns CoursesPublic Successful Response
+   * @returns CoursePublic Successful Response
    * @throws ApiError
    */
   public static readCourses(
@@ -135,40 +94,16 @@ export class CoursesService {
   }
 
   /**
-   * Create Course
-   * Create a course with optional user/role assignment and quiz.
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns Message Successful Response
-   * @throws ApiError
-   */
-  public static createCourse(
-    data: CoursesCreateCourseData,
-  ): CancelablePromise<CoursesCreateCourseResponse> {
-    return __request(OpenAPI, {
-      method: "POST",
-      url: "/api/v1/courses/",
-      body: data.requestBody,
-      mediaType: "application/json",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Read Course By Id
-   * Get a specific course by ID.
-   * - If admin, can read any course.
-   * - If normal user, must be assigned to the course or raise 403.
+   * Read Course
+   * Retrieve a course by its ID. Accessible by any authenticated user.
    * @param data The data for the request.
    * @param data.courseId
-   * @returns CoursePublic Successful Response
+   * @returns CourseDetailed Successful Response
    * @throws ApiError
    */
-  public static readCourseById(
-    data: CoursesReadCourseByIdData,
-  ): CancelablePromise<CoursesReadCourseByIdResponse> {
+  public static readCourse(
+    data: CoursesReadCourseData,
+  ): CancelablePromise<CoursesReadCourseResponse> {
     return __request(OpenAPI, {
       method: "GET",
       url: "/api/v1/courses/{course_id}",
@@ -183,7 +118,7 @@ export class CoursesService {
 
   /**
    * Update Course
-   * Update an existing course (admin-only).
+   * Update a course by its ID. Only accessible by superusers.
    * @param data The data for the request.
    * @param data.courseId
    * @param data.requestBody
@@ -209,7 +144,7 @@ export class CoursesService {
 
   /**
    * Delete Course
-   * Delete a course (admin-only).
+   * Delete a course by its ID. Only accessible by superusers.
    * @param data The data for the request.
    * @param data.courseId
    * @returns Message Successful Response
@@ -231,118 +166,12 @@ export class CoursesService {
   }
 
   /**
-   * Bulk Assign Course
-   * Bulk assign a course to multiple user_ids or roles.
-   * (admin-only).
-   * @param data The data for the request.
-   * @param data.courseId
-   * @param data.requestBody
-   * @returns Message Successful Response
-   * @throws ApiError
-   */
-  public static bulkAssignCourse(
-    data: CoursesBulkAssignCourseData,
-  ): CancelablePromise<CoursesBulkAssignCourseResponse> {
-    return __request(OpenAPI, {
-      method: "POST",
-      url: "/api/v1/courses/{course_id}/assign-bulk",
-      path: {
-        course_id: data.courseId,
-      },
-      body: data.requestBody,
-      mediaType: "application/json",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Assign User To Course
-   * Assign a course to a specific user (admin-only).
-   * @param data The data for the request.
-   * @param data.courseId
-   * @param data.userId
-   * @returns Message Successful Response
-   * @throws ApiError
-   */
-  public static assignUserToCourse(
-    data: CoursesAssignUserToCourseData,
-  ): CancelablePromise<CoursesAssignUserToCourseResponse> {
-    return __request(OpenAPI, {
-      method: "POST",
-      url: "/api/v1/courses/{course_id}/assign/{user_id}",
-      path: {
-        course_id: data.courseId,
-        user_id: data.userId,
-      },
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Get Assigned Courses For User
-   * Get courses assigned to a specific user by user_id.
-   * If current_user is a superuser, they can see *any* user's assigned courses.
-   * Returns a list of courses + a count in the 'CoursesPublic' schema.
-   * @param data The data for the request.
-   * @param data.userId
-   * @param data.skip
-   * @param data.limit
-   * @returns CoursesPublic Successful Response
-   * @throws ApiError
-   */
-  public static getAssignedCoursesForUser(
-    data: CoursesGetAssignedCoursesForUserData,
-  ): CancelablePromise<CoursesGetAssignedCoursesForUserResponse> {
-    return __request(OpenAPI, {
-      method: "GET",
-      url: "/api/v1/courses/user/{user_id}",
-      path: {
-        user_id: data.userId,
-      },
-      query: {
-        skip: data.skip,
-        limit: data.limit,
-      },
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Get Assigned Users For Course
-   * Get users assigned to a specific course by course_id.
-   * (Admin-only)
-   * @param data The data for the request.
-   * @param data.courseId
-   * @returns UserPublic Successful Response
-   * @throws ApiError
-   */
-  public static getAssignedUsersForCourse(
-    data: CoursesGetAssignedUsersForCourseData,
-  ): CancelablePromise<CoursesGetAssignedUsersForCourseResponse> {
-    return __request(OpenAPI, {
-      method: "GET",
-      url: "/api/v1/courses/{course_id}/users",
-      path: {
-        course_id: data.courseId,
-      },
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
    * Attach Quiz To Course
-   * Attach an existing quiz to a course (admin-only).
+   * Attach a quiz to a course. Only accessible by superusers.
    * @param data The data for the request.
-   * @param data.requestBody
-   * @returns Message Successful Response
+   * @param data.courseId
+   * @param data.quizId
+   * @returns CoursePublic Successful Response
    * @throws ApiError
    */
   public static attachQuizToCourse(
@@ -350,32 +179,12 @@ export class CoursesService {
   ): CancelablePromise<CoursesAttachQuizToCourseResponse> {
     return __request(OpenAPI, {
       method: "POST",
-      url: "/api/v1/courses/{course_id}/quiz",
-      body: data.requestBody,
-      mediaType: "application/json",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Get Course Details
-   * Get full course details (admin-only).
-   * - Includes assigned users, roles, and quiz info.
-   * @param data The data for the request.
-   * @param data.courseId
-   * @returns CoursePublic Successful Response
-   * @throws ApiError
-   */
-  public static getCourseDetails(
-    data: CoursesGetCourseDetailsData,
-  ): CancelablePromise<CoursesGetCourseDetailsResponse> {
-    return __request(OpenAPI, {
-      method: "GET",
-      url: "/api/v1/courses/{course_id}/details",
+      url: "/api/v1/courses/{course_id}/attach-quiz",
       path: {
         course_id: data.courseId,
+      },
+      query: {
+        quiz_id: data.quizId,
       },
       errors: {
         422: "Validation Error",
@@ -515,8 +324,73 @@ export class PrivateService {
 
 export class UsersService {
   /**
+   * Read User Me
+   * @returns UserPublic Successful Response
+   * @throws ApiError
+   */
+  public static readUserMe(): CancelablePromise<UsersReadUserMeResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/users/me",
+    })
+  }
+
+  /**
+   * Delete User Me
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteUserMe(): CancelablePromise<UsersDeleteUserMeResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/users/me",
+    })
+  }
+
+  /**
+   * Update User Me
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns UserPublic Successful Response
+   * @throws ApiError
+   */
+  public static updateUserMe(
+    data: UsersUpdateUserMeData,
+  ): CancelablePromise<UsersUpdateUserMeResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/users/me",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Password Me
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static updatePasswordMe(
+    data: UsersUpdatePasswordMeData,
+  ): CancelablePromise<UsersUpdatePasswordMeResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/users/me/password",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
    * Read Users
-   * Retrieve users.
    * @param data The data for the request.
    * @param data.skip
    * @param data.limit
@@ -541,7 +415,6 @@ export class UsersService {
 
   /**
    * Create User
-   * Create new user.
    * @param data The data for the request.
    * @param data.requestBody
    * @returns UserPublic Successful Response
@@ -562,100 +435,7 @@ export class UsersService {
   }
 
   /**
-   * Read User Me
-   * Get current user.
-   * @returns UserPublic Successful Response
-   * @throws ApiError
-   */
-  public static readUserMe(): CancelablePromise<UsersReadUserMeResponse> {
-    return __request(OpenAPI, {
-      method: "GET",
-      url: "/api/v1/users/me",
-    })
-  }
-
-  /**
-   * Delete User Me
-   * Delete own user.
-   * @returns Message Successful Response
-   * @throws ApiError
-   */
-  public static deleteUserMe(): CancelablePromise<UsersDeleteUserMeResponse> {
-    return __request(OpenAPI, {
-      method: "DELETE",
-      url: "/api/v1/users/me",
-    })
-  }
-
-  /**
-   * Update User Me
-   * Update own user.
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns UserPublic Successful Response
-   * @throws ApiError
-   */
-  public static updateUserMe(
-    data: UsersUpdateUserMeData,
-  ): CancelablePromise<UsersUpdateUserMeResponse> {
-    return __request(OpenAPI, {
-      method: "PATCH",
-      url: "/api/v1/users/me",
-      body: data.requestBody,
-      mediaType: "application/json",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Update Password Me
-   * Update own password.
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns Message Successful Response
-   * @throws ApiError
-   */
-  public static updatePasswordMe(
-    data: UsersUpdatePasswordMeData,
-  ): CancelablePromise<UsersUpdatePasswordMeResponse> {
-    return __request(OpenAPI, {
-      method: "PATCH",
-      url: "/api/v1/users/me/password",
-      body: data.requestBody,
-      mediaType: "application/json",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Register User
-   * Create new user without the need to be logged in.
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns UserPublic Successful Response
-   * @throws ApiError
-   */
-  public static registerUser(
-    data: UsersRegisterUserData,
-  ): CancelablePromise<UsersRegisterUserResponse> {
-    return __request(OpenAPI, {
-      method: "POST",
-      url: "/api/v1/users/signup",
-      body: data.requestBody,
-      mediaType: "application/json",
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
    * Read User By Id
-   * Get a specific user by id.
    * @param data The data for the request.
    * @param data.userId
    * @returns UserPublic Successful Response
@@ -678,7 +458,6 @@ export class UsersService {
 
   /**
    * Update User
-   * Update a user.
    * @param data The data for the request.
    * @param data.userId
    * @param data.requestBody
@@ -704,7 +483,6 @@ export class UsersService {
 
   /**
    * Delete User
-   * Delete a user.
    * @param data The data for the request.
    * @param data.userId
    * @returns Message Successful Response

@@ -3,12 +3,14 @@
 import uuid
 from typing import List, Optional, Protocol, Set, Sequence, Type, TypeVar
 
+from fastapi import HTTPException
+from sqlalchemy import UUID, func
 from sqlmodel import SQLModel, Session, select
 from app.core.security import get_password_hash, verify_password
 from app.models import (
-    HasUUID,
-    CourseAssign,
-    RoleEnum,
+    Role,
+    RoleCreate,
+    RoleUpdate,
     UpdatePassword,
     User,
     UserCreate,
@@ -16,7 +18,6 @@ from app.models import (
     Course,
     CourseCreate,
     CourseUpdate,
-    CourseAssignment,
     Quiz,
     QuizCreate,
     QuizUpdate,
@@ -24,47 +25,59 @@ from app.models import (
     UserUpdateMe,
 )
 
+
+
+class HasUUID(Protocol):
+    id: uuid.UUID
+
 T = TypeVar("T", bound=HasUUID)
 def get_by_uuid(db: Session, model: type[T], id: str | uuid.UUID) -> Optional[T]:
     """Fetch a record by UUID, converting string UUIDs."""
     return db.exec(select(model).where(model.id == uuid.UUID(str(id)))).first()
 
-#
-# =========  User CRUD  =========
-#
+# ===========================
+#  USER CRUD
+# ===========================
 
-def create_user(*, session: Session, user_create: UserCreate) -> User:
-    """
-    Create a new User from a UserCreate schema.
-    Hashes the plain-text password before storing.
-    """
+def get_user_by_id(session: Session, user_id: UUID) -> Optional[User]:
+    return session.get(User, user_id)
+
+def get_user_by_email(session: Session, email: str) -> Optional[User]:
+    stmt = select(User).where(User.email == email)
+    return session.exec(stmt).first()
+
+def get_users(session: Session, skip: int = 0, limit: int = 100) -> Sequence[User]:
+    stmt = select(User).offset(skip).limit(limit)
+    return session.exec(stmt).all()
+
+def count_users(session: Session) -> int:
+    """Return the total number of users."""
+    return session.exec(select(func.count()).select_from(User)).one()
+
+def authenticate_user(session: Session, email: str, password: str) -> Optional[User]:
+    """Check if a user with the given email/password exists."""
+    db_user = get_user_by_email(session=session, email=email)
+    if not db_user or not verify_password(password, db_user.hashed_password):
+        return None
+    return db_user
+
+def create_user(session: Session, user_in: UserCreate) -> User:
+    """Create a new User from a UserCreate schema."""
     db_obj = User.model_validate(
-        user_create, update={"hashed_password": get_password_hash(user_create.password)}
+        user_in, update={"hashed_password": get_password_hash(user_in.password)}
     )
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
     return db_obj
 
-def get_user_by_email(*, session: Session, email: str) -> Optional[User]:
-    """Return the user with the given email, or None if not found."""
-    return session.exec(select(User).where(User.email == email)).first()
-
-def get_users_by_role(session: Session, role_name: RoleEnum) -> Sequence[User]:
-    """Fetch all users assigned to a given role."""
-    return session.exec(select(User).where(User.role_name == role_name)).all()
-
-def get_user(session: Session, user_id: uuid.UUID) -> User | None:
-    return session.get(User, user_id)
-
-def authenticate_user(*, session: Session, email: str, password: str) -> Optional[User]:
-    """
-    Check if a user with the given email and password exists.
-    Returns the user if valid, else None.
-    """
-    db_user = get_user_by_email(session=session, email=email)
-    if not db_user or not verify_password(password, db_user.hashed_password):
-        return None
+def update_user(session: Session, db_user: User, user_in: UserUpdate) -> User:
+    """Partially update an existing User with the fields in UserUpdate."""
+    user_data = user_in.model_dump(exclude_unset=True)
+    db_user.sqlmodel_update(user_data)
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
     return db_user
 
 def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | UpdatePassword) -> User:
@@ -79,36 +92,87 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
     session.refresh(db_user)
     return db_user
 
-def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> User:
-    """
-    Partially update an existing User with the fields in UserUpdate.
-    If 'password' is present, hash it and store as hashed_password.
-    """
-    user_data = user_in.model_dump(exclude_unset=True)
-    db_user.sqlmodel_update(user_data)
-    session.add(db_user)
+def delete_user(session: Session, user_id: UUID) -> User:
+    """Delete a User by ID."""
+    db_user = get_user_by_id(session, user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    session.delete(db_user)
     session.commit()
-    session.refresh(db_user)
     return db_user
 
+
 #
-# =========  Course CRUD  =========
+# ===========================
+#  ROLE CRUD
+# ===========================
 #
 
-def create_course(*, session: Session, course_create: CourseCreate) -> Course:
-    """
-    Create a new Course from CourseCreate schema.
-    Validates date constraints via model validators.
-    """
+def get_role_by_id(session: Session, role_id: UUID) -> Optional[Role]:
+    return session.get(Role, role_id)
+
+def get_role_by_name(session: Session, name: str) -> Optional[Role]:
+    stmt = select(Role).where(Role.name == name)
+    return session.exec(stmt).first()
+
+def get_roles(session: Session, skip: int = 0, limit: int = 100) -> Sequence[Role]:
+    stmt = select(Role).offset(skip).limit(limit)
+    return session.exec(stmt).all()
+
+def count_roles(session: Session) -> int:
+    return session.exec(select(func.count()).select_from(Role)).one()
+
+def create_role(session: Session, role_in: RoleCreate) -> Role:
+    existing = get_role_by_name(session, role_in.name)
+    if existing:
+        raise HTTPException(status_code=400, detail="Role name already exists")
+
+    db_obj = Role.model_validate(role_in)
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+def update_role(session: Session, db_role: Role, role_in: RoleUpdate) -> Role:
+    update_data = role_in.model_dump(exclude_unset=True)
+    for field_name, value in update_data.items():
+        setattr(db_role, field_name, value)
+    session.add(db_role)
+    session.commit()
+    session.refresh(db_role)
+    return db_role
+
+def delete_role(session: Session, role_id: UUID) -> Role:
+    db_role = get_role_by_id(session, role_id)
+    if not db_role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    session.delete(db_role)
+    session.commit()
+    return db_role
+
+
+# ===========================
+#  Example: COURSE CRUD
+# ===========================
+
+def get_course_by_id(session: Session, course_id: UUID) -> Optional[Course]:
+    return session.get(Course, course_id)
+
+def get_courses(session: Session, skip: int = 0, limit: int = 100) -> Sequence[Course]:
+    stmt = select(Course).offset(skip).limit(limit)
+    return session.exec(stmt).all()
+
+def count_courses(session: Session) -> int:
+    return session.exec(select(func.count()).select_from(Course)).one()
+
+def create_course(session: Session, course_create: CourseCreate) -> Course:
     db_course = Course.model_validate(course_create)
     session.add(db_course)
     session.commit()
     session.refresh(db_course)
     return db_course
 
-def update_course(
-    *, session: Session, db_course: Course, course_in: CourseUpdate
-) -> Course:
+def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
     """Partially update an existing Course."""
     course_data = course_in.model_dump(exclude_unset=True)
     db_course.sqlmodel_update(course_data)
@@ -119,123 +183,38 @@ def update_course(
     return db_course
 
 #
-# =========  Assignments  =========
+# =========  Course CRUD  =========
 #
 
-def assign_course_to_user(
-    *, session: Session, course_id: uuid.UUID, user_id: uuid.UUID
-) -> CourseAssignment:
-    """
-    Create a CourseAssignment linking a user to a course.
-    Raises an error if the user is already assigned.
-    """
-    assignment = CourseAssignment(course_id=course_id, user_id=user_id)
-    session.add(assignment)
+def create_course(session: Session, course_in: CourseCreate) -> Course:
+    db_course = Course.model_validate(course_in)
+    session.add(db_course)
     session.commit()
-    session.refresh(assignment)
-    return assignment
+    session.refresh(db_course)
+    return db_course
 
-def assign_course_to_role(
-    *, session: Session, course_id: uuid.UUID, role: RoleEnum
-) -> CourseAssignment:
-    """
-    Assigns a course to a specific role.
-    """
-    role_assignment = CourseAssignment(course_id=course_id, role=role)
-    session.add(role_assignment)
+def get_courses(session: Session, skip: int = 0, limit: int = 100) -> List[Course]:
+    courses = session.exec(select(Course).offset(skip).limit(limit)).all()
+    return courses
+
+def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
+    course_data = course_in.dict(exclude_unset=True)
+    for key, value in course_data.items():
+        setattr(db_course, key, value)
+    session.add(db_course)
     session.commit()
-    session.refresh(role_assignment)
-    return role_assignment
+    session.refresh(db_course)
+    return db_course
 
-def bulk_assign_course(*, session: Session, course_id: uuid.UUID, user_ids: list[uuid.UUID] | None = None, roles: list[RoleEnum] | None = None) -> None:
-    """Assign a course to multiple users based on their user_ids and/or roles."""
-    assigned_users: set[tuple[uuid.UUID, str]] = set()
-   
-    if user_ids:
-        user_stmt = select(User.id, User.role_name).where(User.id.in_(user_ids))  # type: ignore
-        assigned_users.update(session.exec(user_stmt).all())
-
-    if roles:
-        role_stmt = select(User.id, User.role_name).where(User.role_name.in_([role.value for role in roles]))  # type: ignore
-        role_user_ids = set(session.exec(role_stmt).all())
-        assigned_users.update(role_user_ids)
-
-    if not assigned_users:
-        return
-
-    existing_assignments = {
-        (ca.user_id, ca.course_id)
-        for ca in session.exec(
-            select(CourseAssignment).where(
-                CourseAssignment.course_id == course_id,
-                CourseAssignment.user_id.in_([user_id for user_id, _ in assigned_users]),  # type: ignore
-            )
-        ).all()
-    }
-
-    new_assignments = [
-        CourseAssignment(course_id=course_id, user_id=user_id, role_name=role_name)
-        for user_id, role_name in assigned_users
-        if (user_id, course_id) not in existing_assignments
-    ]
-
-    session.add_all(new_assignments)
+def delete_course(session: Session, db_course: Course) -> None:
+    session.delete(db_course)
     session.commit()
 
-#
+def attach_quiz_to_course(session: Session, db_course: Course, quiz_id: UUID) -> Course:
+    db_course.quiz_id = quiz_id
+    session.add(db_course)
+    session.commit()
+    session.refresh(db_course)
+    return db_course
+
 # =========  Quiz CRUD  =========
-#
-
-def create_quiz(*, session: Session, quiz_create: QuizCreate) -> Quiz:
-    """
-    Create a new Quiz from QuizCreate schema.
-    The 'course_id' is required in the QuizCreate model.
-    """
-    db_quiz = Quiz.model_validate(quiz_create)
-    session.add(db_quiz)
-    session.commit()
-    session.refresh(db_quiz)
-    return db_quiz
-
-def update_quiz(*, session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
-    """
-    Partially update an existing Quiz with QuizUpdate.
-    Fields like 'course_id', 'max_attempts', 'passing_threshold', 'questions'
-    can be changed if your business logic allows.
-    """
-    quiz_data = quiz_in.model_dump(exclude_unset=True)
-    db_quiz.sqlmodel_update(quiz_data)
-    session.add(db_quiz)
-    session.commit()
-    session.refresh(db_quiz)
-    return db_quiz
-
-#
-# =========  Quiz Attempts  =========
-#
-
-def record_quiz_attempt(
-    *,
-    session: Session,
-    quiz_id: uuid.UUID,
-    user_id: uuid.UUID,
-    score: int,
-    attempt_number: int,
-    passed: bool = False
-) -> QuizAttempt:
-    """
-    Create a new QuizAttempt record for a user & quiz.
-    If you need extra checks (max attempts, user assignment),
-    implement them in routes or a specialized logic function.
-    """
-    attempt = QuizAttempt(
-        quiz_id=quiz_id,
-        user_id=user_id,
-        score=score,
-        attempt_number=attempt_number,
-        passed=passed,
-    )
-    session.add(attempt)
-    session.commit()
-    session.refresh(attempt)
-    return attempt
