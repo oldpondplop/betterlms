@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import List, Optional
 from enum import Enum
 from pydantic import EmailStr
-from sqlmodel import Field, Relationship, SQLModel, Column, JSON
-from sqlalchemy import func
+from sqlmodel import Field, Relationship, SQLModel, Column, JSON, func
 
 
 # =========================================================
@@ -124,12 +123,14 @@ class User(UserBase, table=True):
     # One-to-many with QuizAttempt
     quiz_attempts: List["QuizAttempt"] = Relationship(back_populates="user")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(default=func.now(), onupdate=func.now())
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime | None = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        sa_column_kwargs={
+            "onupdate": lambda: datetime.now(timezone.utc),
+        },
     )
-
 
 # ================================
 # COURSE MODELS
@@ -180,10 +181,13 @@ class Course(CourseBase, table=True):
     # One-to-many with Quiz (assuming multiple quizzes per course)
     quiz: Optional["Quiz"] = Relationship(back_populates="course")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(default=func.now(), onupdate=func.now())
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime | None = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        sa_column_kwargs={
+            "onupdate": lambda: datetime.now(timezone.utc),
+        },
     )
 
 
@@ -262,10 +266,13 @@ class QuizAttempt(QuizAttemptBase, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     user: User = Relationship(back_populates="quiz_attempts")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(default=func.now(), onupdate=func.now())
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime | None = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        sa_column_kwargs={
+            "onupdate": lambda: datetime.now(timezone.utc),
+        },
     )
 
 
