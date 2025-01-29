@@ -1,319 +1,272 @@
-from typing import Optional, Protocol
 import uuid
 from datetime import datetime, date
+from typing import List, Optional
 from enum import Enum
 from pydantic import EmailStr
-from sqlmodel import (
-    SQLModel,
-    JSON,
-    Field,
-    Relationship,
-    Column,
-    Enum as SAEnum,
-    Session,
-    select,
-    String
-)
+from sqlmodel import Field, Relationship, SQLModel, Column, JSON
+from sqlalchemy import func
 
-class HasUUID(Protocol): 
-    """Used to convert id to uuid for get db queries."""
-    id: uuid.UUID 
 
 # =========================================================
-#  Role Models
+#  Enums
 # =========================================================
 
-class CourseStatus(str, Enum):
+class CourseStatusEnum(str, Enum):
     ASSIGNED = "assigned"
     COMPLETED = "completed"
-    MAX_ATTEMPTS_REACHED = "max_attempts_reached"
-
-class RoleEnum(str, Enum):
-    """Enum representing possible user roles."""
-    ADMIN = "admin"
-    USER = "user"
-    INFIRMIERA = "infirmiera"
-    OFICIANTA = "oficianta"
-    BRANCARDIER = "brancardier"
-    ASISTENT_MEDICAL = "asistent medical"
-    FEMEIE_DE_SERVICIU = "femeie de serviciu"
-    MASAJ = "masaj"
-    KINETOTERAPIE = "kinetoterapie"
-    RECEPTIE = "receptie"
-    CONTABILITATE = "contabilitate"
-    INFORMATICA = "informatica"
-    RESURSE_UMANE = "resurse umane"
-    EPIDEMIOLOG = "epidemiolog"
-    MANAGEMENTUL_CALITATII = "managementul calitatii"
-    FARMACIST = "farmacist"
-    BIROU_INTERNARI_EXTERNARI = "birou internari/externari"
+    FAILED = "failed"
 
 
-# =========================================================
-#  User Models
-# =========================================================
+# ================================
+# LINK TABLES
+# ================================
 
-class UserBase(SQLModel):
-    """Base properties for Users."""
-    email: EmailStr
-    user_id: Optional[str] = Field(default=None, max_length=255, description="Employee id")
-    name: Optional[str] = Field(default=None, max_length=255, description="Full Name")
-    role: RoleEnum = Field(default=RoleEnum.USER, description="User role as an enum")
-    is_active: bool = Field(default=True)
-    is_superuser: bool = Field(default=False)
+class CourseRoleLink(SQLModel, table=True):
+    """Junction table linking Courses and Roles (many-to-many)."""
+    course_id: uuid.UUID = Field(foreign_key="course.id", primary_key=True)
+    role_id: uuid.UUID = Field(foreign_key="role.id", primary_key=True)
 
-class UserPublic(UserBase):
-    """Properties returned via API when retrieving user info."""
+
+class CourseUserLink(SQLModel, table=True):
+    """Junction table linking Courses and Users (many-to-many)."""
+    course_id: uuid.UUID = Field(foreign_key="course.id", primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", primary_key=True)
+
+    status: CourseStatusEnum = Field(default=CourseStatusEnum.ASSIGNED)
+    quiz_score: Optional[int] = None
+    attempt_count: int = Field(default=0)
+
+
+# ================================
+# ROLE MODELS
+# ================================
+
+class RoleBase(SQLModel):
+    name: str = Field(unique=True, index=True, max_length=255)
+    description: Optional[str] = None
+
+class RoleCreate(RoleBase):
+    pass
+
+class RolePublic(RoleBase):
     id: uuid.UUID
 
-class UsersPublic(SQLModel):
-    """Helper model for returning multiple users at once along with a 'count'."""
-    data: list[UserPublic]
+class RolesPublic(SQLModel):
+    data: List[RolePublic]
     count: int
 
+class RoleUpdate(SQLModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class Role(RoleBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    
+    # A single Role can have many Users
+    users: List["User"] = Relationship(back_populates="role")
+    # Many-to-many with Courses
+    courses: List["Course"] = Relationship(
+        back_populates="roles",
+        link_model=CourseRoleLink
+    )
+
+
+# ================================
+# USER MODELS
+# ================================
+
+class UserBase(SQLModel):
+    name: str
+    email: EmailStr
+    is_active: bool = True
+    is_superuser: bool = False
+    # NOTE: maybe this should be uniqe?
+    user_id: Optional[str] = Field(default=None, max_length=30, description="Employee id")
+
 class UserCreate(UserBase):
-    """Properties used when creating a new user through the API."""
-    password: str = Field(min_length=8, max_length=40)
+    password: str
+    role_id: uuid.UUID
+
+class UserPublic(UserBase):
+    id: uuid.UUID
+    role_id: uuid.UUID
+
+class UsersPublic(SQLModel):
+    data: List[UserPublic]
+    count: int
 
 class UserUpdate(SQLModel):
-    """Schema for updating an existing user. All fields optional."""
     name: Optional[str] = None
     email: Optional[EmailStr] = None
-    role: Optional[RoleEnum] = None
+    user_id: Optional[str] = None
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
+    role_id: Optional[uuid.UUID] = None
 
 class UserUpdateMe(SQLModel):
-    """Allows the logged-in user to update their own profile."""
-    name: Optional[str]  = Field(default=None, max_length=255)
-    email: Optional[str] = Field(default=None, max_length=255)
+    name: Optional[str]  = None
+    email: Optional[EmailStr] = None
 
 class UpdatePassword(SQLModel):
-    """Model for changing passwords."""
     current_password: str = Field(min_length=8, max_length=40)
     new_password: str = Field(min_length=8, max_length=40)
 
 class User(UserBase, table=True):
-    """Database model for Users."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    email: str = Field(sa_column=Column(String, unique=True, index=True, nullable=False))
     hashed_password: str
-    user_id: Optional[str] = Field(default=None, unique=True, index=True, description="Employee id")
-    role: RoleEnum = Field(
-        default=RoleEnum.USER,
-        sa_column=Column(SAEnum(RoleEnum), nullable=False),
-        description="User role as an enum"
-    )
-    assignments: list["CourseAssignment"] = Relationship(back_populates="user")
-    quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="user")
+    
+    # Single role per user
+    role_id: uuid.UUID = Field(foreign_key="role.id")
+    role: Optional[Role] = Relationship(back_populates="users")
+
+    # Many-to-many with Courses (through CourseUserLink)
+    courses: List["Course"] = Relationship(back_populates="users", link_model=CourseUserLink)
+    # One-to-many with QuizAttempt
+    quiz_attempts: List["QuizAttempt"] = Relationship(back_populates="user")
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(
         default_factory=datetime.utcnow,
-        sa_column=Column(default=datetime.utcnow, onupdate=datetime.utcnow)
+        sa_column=Column(default=func.now(), onupdate=func.now())
     )
 
-# =========================================================
-#  Course Models
-# =========================================================
+
+# ================================
+# COURSE MODELS
+# ================================
 
 class CourseBase(SQLModel):
-    """Base properties for a course"""
-    title: str = Field(..., max_length=255)
-    description: str | None = Field(default=None, max_length=500)
-    materials: list[str] = Field(default=[], sa_column=Column(JSON))
+    title: str = Field(max_length=255)
+    description: Optional[str] = Field(default=None, max_length=500)
+    materials: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     is_active: bool = Field(default=True)
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
 
-class Course(CourseBase, table=True):
-    """Database model for Course"""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    
-    quiz: Optional['Quiz'] = Relationship(back_populates="course")    
-    assignments: list["CourseAssignment"] = Relationship(back_populates="course")
-    
-class CourseCreate(SQLModel):
-    """Schema for creating a course with optional assignments and quiz creation."""
-    title: str = Field(..., max_length=255)
-    description: str | None = Field(default=None, max_length=500)
-    materials: list[str] = Field(default=[], sa_column=Column(JSON))
-    is_active: bool = Field(default=True)
-    start_date: date | None = None
-    end_date: date | None = None
+class CourseCreate(CourseBase):
+    pass
 
-    # Optional assignments
-    assigned_users: list[uuid.UUID] = []
-    assigned_roles: list[RoleEnum] = []
+class CoursePublic(CourseBase):
+    id: uuid.UUID
 
-    # Optional quiz creation
-    create_quiz: bool = False
-
-
-class CourseAssign(SQLModel):
-    """Schema for assigning users and roles to a course."""
-    assigned_users: list[EmailStr] = []
-    assigned_roles: list[RoleEnum] = []
-
-class AttachQuizToCourse(SQLModel):
-    """Schema for attaching an existing quiz to a course."""
-    quiz_id: uuid.UUID
+class CoursesPublic(SQLModel):
+    data: List[CoursePublic]
+    count: int
 
 class CourseUpdate(SQLModel):
-    """Schema for updating a course"""
     title: Optional[str] = None
     description: Optional[str] = None
-    materials: Optional[list[str]] = None
+    materials: Optional[List[str]] = None
     is_active: Optional[bool] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    assigned_users: Optional[uuid.UUID] = None
-    assigned_roles: Optional[RoleEnum] = None
-    
-class CoursePublic(SQLModel):
-    """Public response model including assigned users and roles"""
-    id: uuid.UUID
-    title: str
-    description: str | None = None
-    assigned_users: list[uuid.UUID] | None = None
-    assigned_roles: list[RoleEnum] | None = None
-    materials: list[str] | None = None
 
-class CoursesPublic(SQLModel):
-    """ Helper model for returning multiple courses at once along with a `count`."""
-    data: list[CoursePublic]
-    count: int
-
-# =========================================================
-#  Course Assignment Model (Many-to-Many bridge)
-# =========================================================
-
-class CourseAssignment(SQLModel, table=True):
-    """Many-to-Many bridging table between Users/Roles and Courses."""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    course_id: uuid.UUID = Field(foreign_key="course.id")
-    user_id: uuid.UUID = Field(default=None, foreign_key="user.id")    
-    role: RoleEnum = Field(
-        sa_column=Column(SAEnum(RoleEnum), index=True), 
-        description="Enum representing possible user roles"
-    )
-
-    assigned_at: datetime = Field(default_factory=datetime.utcnow)
-
-    course: Course = Relationship(back_populates="assignments")
-    user: User  = Relationship(back_populates="assignments")
-    
-
-# =========================================================
-#  Quiz Models
-# =========================================================
-
-class QuizBase(SQLModel):
-    """
-    Shared fields for a Quiz:
-     - max_attempts 
-     - passing_threshold
-     - questions (stored as JSON in DB)
-    """
-    max_attempts: int = Field(default=3)
-    passing_threshold: int = Field(default=70)
-    questions: list['QuizQuestion'] = Field(
-        sa_column=Column(JSON),
-        description="list of QuizQuestion objects, stored as JSON."
-    )
-
-class QuizQuestion(SQLModel):
-    """
-    Pydantic model representing a single multiple-choice question.
-    'choices' is a list of possible answers, and 'correct_index' 
-    is the index of the correct choice in that list.
-    """
-    question: str
-    choices: list[str]
-    correct_index: int
-
-class QuizCreate(QuizBase):
-    """
-    Request model for creating a new Quiz.
-    Requires 'course_id' to link the quiz to a course.
-    """
-    course_id: uuid.UUID
-
-class QuizUpdate(SQLModel):
-    """
-    Request model for updating an existing quiz.
-    All fields are optional to allow partial updates.
-    """
-    # course_id: Optional[uuid.UUID] = None
-    max_attempts: Optional[int] = None
-    passing_threshold: Optional[int] = None
-    questions: Optional[list[QuizQuestion]] = None
-
-class QuizPublic(QuizBase):
-    """
-    Response model for reading a Quiz.
-    Inherits QuizBase fields plus 'id' and 'course_id'.
-    """
-    id: uuid.UUID
-    course_id: uuid.UUID
-
-class Quiz(QuizBase, table=True):
-    """
-    Actual database table for a quiz.
-    Each course can have one quiz (course_id unique).
-    """
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    course_id: uuid.UUID = Field(foreign_key="course.id", unique=True, index=True)
-
-    # Relationship back to the Course model
-    course: Course = Relationship(back_populates="quiz")
-    # Relationship to track user attempts
-    attempts: list["QuizAttempt"] = Relationship(back_populates="quiz")
-
-
-# =========================================================
-#  ATTACH QUIZ TO EXISTING COURSE
-# =========================================================
-
-class AttachQuizToCourse(SQLModel):
-    """Schema for adding a quiz to an existing course."""
-    course_id: uuid.UUID
+class CourseAttachQuiz(SQLModel):
     quiz_id: uuid.UUID
 
+class CourseDetailed(CoursePublic):
+    roles: List[RolePublic] = []
+    users: List[UserPublic] = []
+    quiz: Optional['QuizPublic'] = None
 
-# =========================================================
-#  Quiz Attempt Model
-# =========================================================
-
-class QuizAttempt(SQLModel, table=True):
-    """Tracks each attempt at a quiz by a specific user."""
+class Course(CourseBase, table=True):
+    """The actual Course table model."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
-    user_id: uuid.UUID = Field(foreign_key="user.id")
+
+    # Many-to-many with Roles
+    roles: List[Role] = Relationship(back_populates="courses", link_model=CourseRoleLink)
+    # Many-to-many with Users
+    users: List[User] = Relationship(back_populates="courses", link_model=CourseUserLink)
+    # One-to-many with Quiz (assuming multiple quizzes per course)
+    quiz: Optional["Quiz"] = Relationship(back_populates="course")
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(default=func.now(), onupdate=func.now())
+    )
+
+
+# ================================
+# QUIZ MODELS
+# ================================
+class QuizQuestion(SQLModel):
+    question: str
+    choices: List[str]
+    correct_index: int
+
+class QuizBase(SQLModel):
+    max_attempts: int = Field(default=3)
+    passing_threshold: int = Field(default=70)
+    questions: List[QuizQuestion] = Field(default_factory=list, sa_column=Column(JSON))
+
+class QuizCreate(QuizBase):
+    course_id: uuid.UUID
+
+class QuizPublic(QuizBase):
+    id: uuid.UUID
+    course_id: uuid.UUID
+
+class QuizzesPublic(SQLModel):
+    data: List[QuizPublic]
+    count: int
+
+class QuizUpdate(SQLModel):
+    max_attempts: Optional[int] = None
+    passing_threshold: Optional[int] = None
+    questions: Optional[List[QuizQuestion]] = None
+
+class Quiz(QuizBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     
+    # Relationship back to the Course model
+    course_id: uuid.UUID = Field(foreign_key="course.id", unique=True)
+    course: Course = Relationship(back_populates="quiz")
+    # Relationship to track user attempts
+    attempts: List["QuizAttempt"] = Relationship(back_populates="quiz")
+
+
+# ================================
+# QUIZ ATTEMPT MODELS
+# ================================
+
+class QuizAttemptBase(SQLModel):
     score: int
     attempt_number: int
     passed: bool = Field(default=False)
 
-    # Relationships
+class QuizAttemptCreate(QuizAttemptBase):
+    quiz_id: uuid.UUID
+    user_id: uuid.UUID
+
+class QuizAttemptPublic(QuizAttemptBase):
+    id: uuid.UUID
+    quiz_id: uuid.UUID
+    user_id: uuid.UUID
+
+class QuizAttemptsPublic(SQLModel):
+    data: List[QuizAttemptPublic]
+    count: int
+
+class QuizAttemptUpdate(SQLModel):
+    score: Optional[int] = None
+    attempt_number: Optional[int] = None
+    passed: Optional[bool] = None
+
+class QuizAttempt(QuizAttemptBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
     quiz: Quiz = Relationship(back_populates="attempts")
+
+    user_id: uuid.UUID = Field(foreign_key="user.id")
     user: User = Relationship(back_populates="quiz_attempts")
 
-
-# =========================================================
-#  Notification Model
-# =========================================================
-
-# class Notification(SQLModel, table=True):
-#     """Table for storing system notifications sent to users."""
-#     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-#     user_id: uuid.UUID = Field(foreign_key="user.id")
-    
-#     message: str = Field(max_length=500)
-#     is_read: bool = Field(default=False)
-#     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-#     # Relationship to the user
-#     user: User = Relationship()
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(default=func.now(), onupdate=func.now())
+    )
 
 
 # =========================================================
@@ -321,18 +274,13 @@ class QuizAttempt(SQLModel, table=True):
 # =========================================================
 
 class Token(SQLModel):
-    """Returned by the auth system on successful login."""
     access_token: str
     token_type: str = "bearer"
 
-
 class TokenPayload(SQLModel):
-    """Extracted from JWT tokens to identify the user (sub)."""
     sub: str | None = None
 
-
 class NewPassword(SQLModel):
-    """Used for password resets with a token-based workflow."""
     token: str
     new_password: str = Field(min_length=8, max_length=40)
 
@@ -342,128 +290,4 @@ class NewPassword(SQLModel):
 # =========================================================
 
 class Message(SQLModel):
-    """A generic message model for simple string responses."""
     message: str
-
-
-
-
-'''
-import uuid
-from datetime import datetime, date
-from typing import Optional, list
-from sqlmodel import SQLModel, Field, Relationship, Column
-from sqlalchemy import JSON
-from enum import Enum
-
-# =========================================================
-# Role Models
-# =========================================================
-
-class RoleEnum(str, Enum):
-    """Enum for predefined user roles."""
-    ADMIN = "admin"
-    EMPLOYEE = "employee"
-    MANAGER = "manager"
-    INSTRUCTOR = "instructor"
-
-class RoleBase(SQLModel):
-    name: RoleEnum = Field(unique=True, index=True, max_length=50)
-
-class Role(RoleBase, table=True):
-    """Database model for roles."""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    users: list["User"] = Relationship(back_populates="role")
-
-class RoleCreate(RoleBase):
-    pass
-
-class RoleUpdate(SQLModel):
-    name: RoleEnum | None = None
-
-# =========================================================
-# User Models
-# =========================================================
-
-class UserBase(SQLModel):
-    """Base properties for Users."""
-    user_id: str = Field(unique=True, index=True, max_length=50)
-    name: str = Field(max_length=255)
-    email: str = Field(unique=True, index=True, max_length=255)
-    is_active: bool = Field(default=True)
-    is_superuser: bool = Field(default=False)
-    role_id: uuid.UUID | None = Field(foreign_key="role.id", default=None)
-
-class User(UserBase, table=True):
-    """Database model for Users."""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
-    assignments: list["CourseAssignment"] = Relationship(back_populates="user")
-    quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="user")
-    role: Optional[Role] = Relationship(back_populates="users")
-
-class UserCreate(UserBase):
-    password: str = Field(min_length=8, max_length=40)
-
-class UserUpdate(SQLModel):
-    name: str | None = None
-    email: str | None = None
-    is_active: bool | None = None
-    is_superuser: bool | None = None
-    role_id: uuid.UUID | None = None
-
-# =========================================================
-# Course Models
-# =========================================================
-
-class CourseBase(SQLModel):
-    """Base properties for a course."""
-    title: str = Field(max_length=255)
-    description: str | None = None
-    materials: list[str] = Field(default=[], sa_column=Column(JSON))
-    is_active: bool = Field(default=True)
-    start_date: date | None = None
-    end_date: date | None = None
-
-class Course(CourseBase, table=True):
-    """Database model for Course."""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
-    quiz: Optional["Quiz"] = Relationship(back_populates="course")
-    assignments: list["CourseAssignment"] = Relationship(back_populates="course")
-
-class CourseCreate(CourseBase):
-    assigned_user_ids: list[uuid.UUID] = []
-    assigned_role_ids: list[uuid.UUID] = []
-    create_quiz: bool = False
-
-class CourseUpdate(SQLModel):
-    title: str | None = None
-    description: str | None = None
-    materials: list[str] | None = None
-    is_active: bool | None = None
-    start_date: date | None = None
-    end_date: date | None = None
-    assigned_user_ids: list[uuid.UUID] | None = None
-    assigned_role_ids: list[uuid.UUID] | None = None
-
-# =========================================================
-# Course Assignment Model (Handles Both Users & Roles)
-# =========================================================
-
-class CourseAssignment(SQLModel, table=True):
-    """Many-to-Many bridging table between Users and Courses.
-    If assigned via role, user_id is still stored for consistency."""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    course_id: uuid.UUID = Field(foreign_key="course.id")
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    role_id: uuid.UUID | None = Field(foreign_key="role.id", default=None)  # ✅ Tracks role-based assignments
-    assigned_at: datetime = Field(default_factory=datetime.utcnow)
-
-    course: Course = Relationship(back_populates="assignments")
-    user: User = Relationship(back_populates="assignments")
-    role: Optional[Role] = Relationship(back_populates="assignments")
-
-
-
-'''
