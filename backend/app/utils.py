@@ -131,13 +131,9 @@ async def log_request(request: Request, call_next: Callable) -> None:
     except Exception:
         body = await request.body()
         try:
-            body = body.decode('utf-8') if body else "No Body"
+            body = body.decode("utf-8")
         except UnicodeDecodeError:
-            # If UTF-8 decoding fails, try a different encoding or log as raw bytes
-            try:
-                body = body.decode('latin-1') if body else "No Body"
-            except Exception:
-                body = "Binary or non-UTF-8 data"
+            body = "<Binary Data>"
 
     log_data = {
         "method": request.method,

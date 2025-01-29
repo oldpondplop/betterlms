@@ -1,3 +1,4 @@
+from app import crud
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -11,16 +12,15 @@ def test_create_user(client: TestClient, db: Session) -> None:
         json={
             "email": "pollo@listo.com",
             "password": "password123",
-            "full_name": "Pollo Listo",
+            "name": "Pollo Listo",
         },
     )
 
     assert r.status_code == 200
 
     data = r.json()
-
-    user = db.exec(select(User).where(User.id == data["id"])).first()
+    user = crud.get_by_uuid(db, User, data["id"])
 
     assert user
     assert user.email == "pollo@listo.com"
-    assert user.full_name == "Pollo Listo"
+    assert user.name == "Pollo Listo"

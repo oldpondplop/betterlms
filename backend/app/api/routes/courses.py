@@ -3,7 +3,7 @@ import shutil
 from typing import Any, List
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import select, func
 from app.api.deps import (
@@ -40,13 +40,12 @@ def upload_material(admin_user: CurrentSuperUser, file: UploadFile = File(...)):
     return str(file_path)
 
 @router.get("/materials/{filename}")
-def get_material(admin_user: CurrentSuperUser, filename: str):
+def get_material(current_user: CurrentUser, filename: str):
     """Retrieve a course material by filename."""
     file_path = settings.UPLOAD_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(str(file_path), headers={"Content-Disposition": f"attachment; filename={filename}"})
-
+    return FileResponse(file_path)
 
 @router.get("/", response_model=CoursesPublic)
 def read_courses(
@@ -73,8 +72,9 @@ def read_courses(
             id=str(course.id),  # Make sure ID is converted to string
             title=course.title,
             description=course.description,
-            assigned_users=[str(a.user_id) for a in course.assignments],  # Convert UUIDs to strings
-            assigned_roles=list(set(a.role_name for a in course.assignments))
+            assigned_users=[a.user_id for a in course.assignments],
+            assigned_roles=list(set(a.role_name for a in course.assignments)),
+            materials=course.materials  
         )
         for course in courses
     ]
