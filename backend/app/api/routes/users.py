@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app import crud
 from app.core.config import settings
@@ -22,11 +22,12 @@ from app.models import (
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/", response_model=UsersPublic)
-def read_users(session: SessionDep, admin_user: CurrentSuperUser, skip: int = 0, limit: int = 100) -> Any:
-    count = crud.get_total_count(session, User)
-    users = crud.get_users(session, skip, limit)
-    return UsersPublic(data=users, count=count)
+@router.get("/", response_model=UsersPublic, dependencies=[Depends(CurrentSuperUser)])
+def get_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
+    return UsersPublic(
+        data=crud.count_users(session), 
+        count=crud.get_users(session, skip=skip, limit=limit)
+    )
 
 @router.get("/{user_id}", response_model=UserPublic)
 def read_user_by_id(user_id: uuid.UUID, session: SessionDep, admin_user: CurrentSuperUser) -> Any:
@@ -34,12 +35,11 @@ def read_user_by_id(user_id: uuid.UUID, session: SessionDep, admin_user: Current
         return user
     raise HTTPException(status_code=404, detail="User not found")
 
-@router.post("/", response_model=UserPublic)
-def create_user(*, session: SessionDep, admin_user: CurrentSuperUser, user_in: UserCreate) -> Any:
+@router.post("/", response_model=UserPublic, dependencies=[Depends(CurrentSuperUser)])
+def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
     if (user:=crud.get_user_by_email(session=session, email=user_in.email)):
         raise HTTPException(status_code=400, detail="The user with this email already exists in the system.")
-
-    user = crud.create_user(session=session, user_create=user_in)
+    user = crud.create_user(session=session, user_in=user_in)
     # TODO: implement this part
     if settings.emails_enabled and user_in.email:
         email_data = generate_new_account_email(email_to=user_in.email, username=user_in.email, password=user_in.password)
@@ -52,8 +52,7 @@ def update_user_me(*, session: SessionDep, current_user: CurrentUser, user_in: U
         existing_user = crud.get_user_by_email(session=session, email=user_in.email)
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(status_code=409, detail="User with this email already exists")
-    crud.update_user_me(session=session, db_user=current_user, user_in=user_in)
-    return current_user
+    return crud.update_user_me(session=session, db_user=current_user, user_in=user_in)
 
 @router.patch("/me/password", response_model=Message)
 def update_password_me(*, session: SessionDep, body: UpdatePassword, current_user: CurrentUser) -> Any:
