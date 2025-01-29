@@ -1,5 +1,5 @@
 import {
-  Button,
+  IconButton,
   Menu,
   MenuButton,
   MenuItem,
@@ -7,56 +7,131 @@ import {
   useDisclosure,
 } from "@chakra-ui/react"
 import { BsThreeDotsVertical } from "react-icons/bs"
-import { FiEdit, FiTrash } from "react-icons/fi"
+import { FiEdit, FiTrash2, FiLayers } from "react-icons/fi"
+import type { UserPublic, CoursePublic, RolePublic } from "../../client"
 
-import type { UserPublic, CoursePublic } from "../../client"
+// Components imports
 import EditUser from "../Admin/EditUser"
 import DeleteUser from "../Admin/DeleteUser"
 import EditCourse from "../Course/EditCourse"
 import DeleteCourse from "../Course/DeleteCourse"
-// import EditQuiz from "../Quiz/EditQuiz"
-// import DeleteQuiz from "../Quiz/DeleteQuiz"
+import EditRole from "../Role/EditRole"
+import DeleteRole from "../Role/DeleteRole"
+// import AssignRole from "../Role/AssignRole"
 
-// ✅ Define the possible types
-interface ActionsMenuProps {
-  type: "User" | "Course" 
-  value: UserPublic | CoursePublic 
-  disabled?: boolean
+// Define specific props for each type
+interface UserActionsProps {
+  type: "User"
+  value: UserPublic
 }
+
+interface CourseActionsProps {
+  type: "Course"
+  value: CoursePublic
+}
+
+interface RoleActionsProps {
+  type: "Role"
+  value: RolePublic
+}
+
+// Combine them into a union type
+type ActionsMenuProps = {
+  disabled?: boolean
+} & (UserActionsProps | CourseActionsProps | RoleActionsProps)
 
 const ActionsMenu = ({ type, value, disabled }: ActionsMenuProps) => {
   const editModal = useDisclosure()
   const deleteModal = useDisclosure()
+  const assignModal = useDisclosure()
 
   return (
     <>
       <Menu>
-        <MenuButton isDisabled={disabled} as={Button} rightIcon={<BsThreeDotsVertical />} variant="unstyled" />
+        <MenuButton
+          as={IconButton}
+          aria-label="Options"
+          icon={<BsThreeDotsVertical />}
+          variant="ghost"
+          size="sm"
+          isDisabled={disabled}
+        />
         <MenuList>
-          <MenuItem onClick={editModal.onOpen} icon={<FiEdit fontSize="16px" />}>
+          <MenuItem 
+            icon={<FiEdit size="1rem" />}
+            onClick={editModal.onOpen}
+          >
             Edit {type}
           </MenuItem>
-          <MenuItem onClick={deleteModal.onOpen} icon={<FiTrash fontSize="16px" />} color="ui.danger">
+
+          {type === "Role" && (
+            <MenuItem 
+              icon={<FiLayers size="1rem" />}
+              onClick={assignModal.onOpen}
+            >
+              Assign {type}
+            </MenuItem>
+          )}
+
+          <MenuItem 
+            icon={<FiTrash2 size="1rem" />}
+            onClick={deleteModal.onOpen}
+            color="ui.danger"
+          >
             Delete {type}
           </MenuItem>
         </MenuList>
       </Menu>
 
-      {/* ✅ Render Edit & Delete Modals based on type */}
       {type === "User" && (
         <>
-          <EditUser user={value as UserPublic} isOpen={editModal.isOpen} onClose={editModal.onClose} />
-          <DeleteUser userId={(value as UserPublic).id} isOpen={deleteModal.isOpen} onClose={deleteModal.onClose} />
+          <EditUser
+            user={value}
+            isOpen={editModal.isOpen}
+            onClose={editModal.onClose}
+          />
+          <DeleteUser
+            userId={value.id}
+            isOpen={deleteModal.isOpen}
+            onClose={deleteModal.onClose}
+          />
         </>
       )}
 
       {type === "Course" && (
         <>
-          <EditCourse course={value as CoursePublic} isOpen={editModal.isOpen} onClose={editModal.onClose} />
-          <DeleteCourse courseId={(value as CoursePublic).id} isOpen={deleteModal.isOpen} onClose={deleteModal.onClose} />
+          <EditCourse
+            course={value}
+            isOpen={editModal.isOpen}
+            onClose={editModal.onClose}
+          />
+          <DeleteCourse
+            courseId={value.id}
+            isOpen={deleteModal.isOpen}
+            onClose={deleteModal.onClose}
+          />
         </>
       )}
 
+      {type === "Role" && (
+        <>
+          <EditRole
+            role={value}
+            isOpen={editModal.isOpen}
+            onClose={editModal.onClose}
+          />
+          <DeleteRole
+            role={value}
+            isOpen={deleteModal.isOpen}
+            onClose={deleteModal.onClose}
+          />
+          {/* <AssignRole
+            role={value}
+            isOpen={assignModal.isOpen}
+            onClose={assignModal.onClose}
+          /> */}
+        </>
+      )}
     </>
   )
 }

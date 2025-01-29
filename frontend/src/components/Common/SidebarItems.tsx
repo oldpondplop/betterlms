@@ -11,6 +11,7 @@ const items = [
   { icon: FiBookOpen, title: "Courses", path: "/course" }, // ✅ Courses Management
   // { icon: FiFileText, title: "Quizzes", path: "/quiz" }, // 🆕 Quiz Management
   { icon: FiSettings, title: "User Settings", path: "/settings" },
+  { icon: FiSettings, title: "Roles", path: "/role" },
 ]
 
 interface SidebarItemsProps {

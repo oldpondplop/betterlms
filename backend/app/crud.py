@@ -101,7 +101,9 @@ def delete_user(session: Session, user_id: UUID) -> User:
     session.commit()
     return db_user
 
-
+def get_total_count(session: Session, model: type[SQLModel]) -> int:
+    """Get total count of records for any SQLModel."""
+    return session.exec(select(func.count()).select_from(model)).one()
 #
 # ===========================
 #  ROLE CRUD

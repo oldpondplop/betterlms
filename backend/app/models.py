@@ -75,7 +75,7 @@ class Role(RoleBase, table=True):
 
 class UserBase(SQLModel):
     name: str
-    email: EmailStr
+    email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = True
     is_superuser: bool = False
     # NOTE: maybe this should be uniqe?

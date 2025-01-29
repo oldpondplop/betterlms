@@ -35,14 +35,6 @@ import {
   
   const PER_PAGE = 5
   
-  function getCoursesQueryOptions({ page }: { page: number }) {
-    return {
-      queryFn: () =>
-        CoursesService.readCourses({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
-      queryKey: ["courses", { page }],
-    }
-  }
-  
   function CoursesTable() {
     const queryClient = useQueryClient()
     const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
@@ -56,7 +48,8 @@ import {
       isPending,
       isPlaceholderData,
     } = useQuery({
-      ...getCoursesQueryOptions({ page }),
+      queryFn: () => CoursesService.readCourses({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
+      queryKey: ["courses", { page }],
       placeholderData: (prevData) => prevData,
     })
   
@@ -65,9 +58,12 @@ import {
   
     useEffect(() => {
       if (hasNextPage) {
-        queryClient.prefetchQuery(getCoursesQueryOptions({ page: page + 1 }))
+        void queryClient.prefetchQuery({
+          queryKey: ["courses", { page: page + 1 }],
+          queryFn: () => CoursesService.readCourses({ skip: page * PER_PAGE, limit: PER_PAGE }),
+        })
       }
-    }, [page, queryClient, hasNextPage])
+    }, [hasNextPage, page, queryClient])
   
     return (
       <>

@@ -11,16 +11,18 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Select,
   Switch,
   VStack,
 } from "@chakra-ui/react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
 import {
   type ApiError,
   type UserPublic,
   type UserUpdate,
   UsersService,
+  RolesService,
 } from "../../client"
 import useCustomToast from "../../hooks/useCustomToast"
 import { handleError } from "../../utils"
@@ -51,6 +53,12 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
       is_superuser: user.is_superuser,
       role_id: user.role_id,
     },
+  })
+
+  // Fetch roles for role selection
+  const { data: rolesResponse } = useQuery({
+    queryKey: ["roles"],
+    queryFn: () => RolesService.getRoles(),
   })
 
   const mutation = useMutation({
@@ -141,6 +149,25 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
                 <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>
               )}
             </FormControl>
+
+            {!isCurrentUser && rolesResponse?.data && (
+              <FormControl>
+                <FormLabel htmlFor="role_id">Role</FormLabel>
+                <Select
+                  id="role_id"
+                  {...register("role_id")}
+                  placeholder="Select role"
+                >
+                  <option value="">No Role</option>
+                  {rolesResponse.data.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                      {role.description && ` - ${role.description}`}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
             {!isCurrentUser && (
               <>

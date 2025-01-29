@@ -67,8 +67,9 @@ def create_user(*, session: SessionDep, admin_user: CurrentSuperUser, user_in: U
     if (user:=crud.get_user_by_email(session=session, email=user_in.email)):
         raise HTTPException(status_code=400, detail="The user with this email already exists in the system.")
 
-    user = crud.create_user(session=session, user_create=user_in)
-    # TODO: implement this part
+    # Changed user_create to user_in to match the crud function signature
+    user = crud.create_user(session=session, user_in=user_in)
+    
     if settings.emails_enabled and user_in.email:
         email_data = generate_new_account_email(email_to=user_in.email, username=user_in.email, password=user_in.password)
         send_email(email_to=user_in.email, subject=email_data.subject, html_content=email_data.html_content)

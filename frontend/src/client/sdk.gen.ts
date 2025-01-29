@@ -16,6 +16,10 @@ import type {
   CoursesDeleteCourseResponse,
   CoursesAttachQuizToCourseData,
   CoursesAttachQuizToCourseResponse,
+  CoursesAssignRoleToCourseData,
+  CoursesAssignRoleToCourseResponse,
+  CoursesRemoveRoleFromCourseData,
+  CoursesRemoveRoleFromCourseResponse,
   LoginLoginAccessTokenData,
   LoginLoginAccessTokenResponse,
   LoginTestTokenResponse,
@@ -27,6 +31,19 @@ import type {
   LoginRecoverPasswordHtmlContentResponse,
   PrivateCreateUserData,
   PrivateCreateUserResponse,
+  RolesGetRolesResponse,
+  RolesCreateRoleData,
+  RolesCreateRoleResponse,
+  RolesGetRoleData,
+  RolesGetRoleResponse,
+  RolesUpdateRoleData,
+  RolesUpdateRoleResponse,
+  RolesDeleteRoleData,
+  RolesDeleteRoleResponse,
+  RolesGetUsersByRoleData,
+  RolesGetUsersByRoleResponse,
+  RolesGetCoursesByRoleData,
+  RolesGetCoursesByRoleResponse,
   UsersReadUserMeResponse,
   UsersDeleteUserMeResponse,
   UsersUpdateUserMeData,
@@ -191,6 +208,56 @@ export class CoursesService {
       },
     })
   }
+
+  /**
+   * Assign Role To Course
+   * Assign a role to a course. Only accessible by superusers.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.roleId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static assignRoleToCourse(
+    data: CoursesAssignRoleToCourseData,
+  ): CancelablePromise<CoursesAssignRoleToCourseResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/assign-role/{role_id}",
+      path: {
+        course_id: data.courseId,
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Remove Role From Course
+   * Remove a role from a course. Only accessible by superusers.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.roleId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static removeRoleFromCourse(
+    data: CoursesRemoveRoleFromCourseData,
+  ): CancelablePromise<CoursesRemoveRoleFromCourseResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/remove-role/{role_id}",
+      path: {
+        course_id: data.courseId,
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
 }
 
 export class LoginService {
@@ -315,6 +382,166 @@ export class PrivateService {
       url: "/api/v1/private/users/",
       body: data.requestBody,
       mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+}
+
+export class RolesService {
+  /**
+   * Get Roles
+   * @returns RolesPublic Successful Response
+   * @throws ApiError
+   */
+  public static getRoles(): CancelablePromise<RolesGetRolesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/roles/",
+    })
+  }
+
+  /**
+   * Create Role
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static createRole(
+    data: RolesCreateRoleData,
+  ): CancelablePromise<RolesCreateRoleResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/roles/",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static getRole(
+    data: RolesGetRoleData,
+  ): CancelablePromise<RolesGetRoleResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/roles/{role_id}",
+      path: {
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @param data.requestBody
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static updateRole(
+    data: RolesUpdateRoleData,
+  ): CancelablePromise<RolesUpdateRoleResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/roles/{role_id}",
+      path: {
+        role_id: data.roleId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Delete Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteRole(
+    data: RolesDeleteRoleData,
+  ): CancelablePromise<RolesDeleteRoleResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/roles/{role_id}",
+      path: {
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Users By Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @param data.skip
+   * @param data.limit
+   * @returns UsersPublic Successful Response
+   * @throws ApiError
+   */
+  public static getUsersByRole(
+    data: RolesGetUsersByRoleData,
+  ): CancelablePromise<RolesGetUsersByRoleResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/roles/{role_id}/users",
+      path: {
+        role_id: data.roleId,
+      },
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Courses By Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @param data.skip
+   * @param data.limit
+   * @returns CoursesPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCoursesByRole(
+    data: RolesGetCoursesByRoleData,
+  ): CancelablePromise<RolesGetCoursesByRoleResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/roles/{role_id}/courses",
+      path: {
+        role_id: data.roleId,
+      },
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
       errors: {
         422: "Validation Error",
       },

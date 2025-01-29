@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlmodel import select
 from typing import Annotated, Any
-from app.api.deps import CurrentSuperUser, SessionDep
+from app.api.deps import CurrentSuperUser, SessionDep, get_current_active_superuser
 from app.models import (
     Course, CoursesPublic, Message, Role, RoleCreate, RolePublic, RoleUpdate, 
     RolesPublic, User, UsersPublic, CourseRoleLink
 )
 
-router = APIRouter(prefix="/roles", tags=["roles"], dependencies=[Depends(CurrentSuperUser)])
+router = APIRouter(prefix="/roles", tags=["roles"], dependencies=[Depends(get_current_active_superuser)])
 
 def get_role_or_404(role_id: uuid.UUID, session: SessionDep) -> Role:
     if not (role := session.get(Role, role_id)):

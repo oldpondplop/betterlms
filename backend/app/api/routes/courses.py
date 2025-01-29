@@ -1,15 +1,19 @@
 from uuid import UUID
 from typing import Any, List
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 
 from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser
 from app.models import (
     Course,
     CourseCreate,
     CoursePublic,
+    CourseRoleLink,
     CourseUpdate,
     CourseDetailed,
+    Role,
     RolePublic,
     UserPublic,
     QuizPublic,
@@ -120,3 +124,68 @@ def attach_quiz_to_course(
     course = get_course_by_id(session, course_id)
     course = crud.attach_quiz_to_course(session=session, db_course=course, quiz_id=quiz_id)
     return course
+    
+@router.post("/{course_id}/assign-role/{role_id}", response_model=Message)
+def assign_role_to_course(
+    *,
+    session: SessionDep,
+    course_id: uuid.UUID,
+    role_id: uuid.UUID,
+    admin_user: CurrentSuperUser,
+) -> Message:
+    """
+    Assign a role to a course. Only accessible by superusers.
+    """
+    # Check if the course exists
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Check if the role exists
+    role = session.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    # Check if the role is already assigned to the course
+    existing_link = session.exec(
+        select(CourseRoleLink).where(
+            CourseRoleLink.course_id == course_id,
+            CourseRoleLink.role_id == role_id,
+        )
+    ).first()
+    if existing_link:
+        raise HTTPException(status_code=400, detail="Role already assigned to this course")
+
+    # Create the link
+    link = CourseRoleLink(course_id=course_id, role_id=role_id)
+    session.add(link)
+    session.commit()
+
+    return Message(message="Role assigned to course successfully")
+
+@router.delete("/{course_id}/remove-role/{role_id}", response_model=Message)
+def remove_role_from_course(
+    *,
+    session: SessionDep,
+    course_id: uuid.UUID,
+    role_id: uuid.UUID,
+    admin_user: CurrentSuperUser,
+) -> Message:
+    """
+    Remove a role from a course. Only accessible by superusers.
+    """
+    # Check if the link exists
+    link = session.exec(
+        select(CourseRoleLink).where(
+            CourseRoleLink.course_id == course_id,
+            CourseRoleLink.role_id == role_id,
+        )
+    ).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Role not assigned to this course")
+
+    # Delete the link
+    session.delete(link)
+    session.commit()
+
+    return Message(message="Role removed from course successfully")

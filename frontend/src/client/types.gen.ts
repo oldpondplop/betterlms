@@ -41,6 +41,11 @@ export type CoursePublic = {
   id: string
 }
 
+export type CoursesPublic = {
+  data: Array<CoursePublic>
+  count: number
+}
+
 export type CourseUpdate = {
   title?: string | null
   description?: string | null
@@ -85,10 +90,25 @@ export type QuizQuestion = {
   correct_index: number
 }
 
+export type RoleCreate = {
+  name: string
+  description?: string | null
+}
+
 export type RolePublic = {
   name: string
   description?: string | null
   id: string
+}
+
+export type RolesPublic = {
+  data: Array<RolePublic>
+  count: number
+}
+
+export type RoleUpdate = {
+  name?: string | null
+  description?: string | null
 }
 
 export type Token = {
@@ -191,6 +211,20 @@ export type CoursesAttachQuizToCourseData = {
 
 export type CoursesAttachQuizToCourseResponse = CoursePublic
 
+export type CoursesAssignRoleToCourseData = {
+  courseId: string
+  roleId: string
+}
+
+export type CoursesAssignRoleToCourseResponse = Message
+
+export type CoursesRemoveRoleFromCourseData = {
+  courseId: string
+  roleId: string
+}
+
+export type CoursesRemoveRoleFromCourseResponse = Message
+
 export type LoginLoginAccessTokenData = {
   formData: Body_login_login_access_token
 }
@@ -222,6 +256,49 @@ export type PrivateCreateUserData = {
 }
 
 export type PrivateCreateUserResponse = UserPublic
+
+export type RolesGetRolesResponse = RolesPublic
+
+export type RolesCreateRoleData = {
+  requestBody: RoleCreate
+}
+
+export type RolesCreateRoleResponse = RolePublic
+
+export type RolesGetRoleData = {
+  roleId: string
+}
+
+export type RolesGetRoleResponse = RolePublic
+
+export type RolesUpdateRoleData = {
+  requestBody: RoleUpdate
+  roleId: string
+}
+
+export type RolesUpdateRoleResponse = RolePublic
+
+export type RolesDeleteRoleData = {
+  roleId: string
+}
+
+export type RolesDeleteRoleResponse = Message
+
+export type RolesGetUsersByRoleData = {
+  limit?: number
+  roleId: string
+  skip?: number
+}
+
+export type RolesGetUsersByRoleResponse = UsersPublic
+
+export type RolesGetCoursesByRoleData = {
+  limit?: number
+  roleId: string
+  skip?: number
+}
+
+export type RolesGetCoursesByRoleResponse = CoursesPublic
 
 export type UsersReadUserMeResponse = UserPublic
 
