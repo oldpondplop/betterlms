@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime, date, timezone
 from typing import List, Optional
 from enum import Enum
-from pydantic import EmailStr
-from sqlmodel import Field, Relationship, SQLModel, Column, JSON, func
-
-
+from pydantic import EmailStr, BaseModel
+from sqlmodel import Field, Relationship, SQLModel, Column
+from sqlalchemy.ext.mutable import MutableList
+from sqlalchemy.types import JSON
 # =========================================================
 #  Enums
 # =========================================================
@@ -139,7 +139,10 @@ class User(UserBase, table=True):
 class CourseBase(SQLModel):
     title: str = Field(max_length=255)
     description: Optional[str] = Field(default=None, max_length=500)
-    materials: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    materials: List[str] = Field(
+        default_factory=list,
+        sa_column=Column(MutableList.as_mutable(JSON()))
+    )
     is_active: bool = Field(default=True)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -165,13 +168,33 @@ class CourseUpdate(SQLModel):
 class CourseAttachQuiz(SQLModel):
     quiz_id: uuid.UUID
 
+class CoursePublicFull(CoursePublic):
+    roles: List[RolePublic] = []
+    users: List[UserPublic] = []
+    quiz: Optional['QuizPublic'] = None
+
+class CourseCreateFull(CourseCreate):
+    roles: List[uuid.UUID] = []
+    users: List[uuid.UUID] = []
+    quiz: Optional['QuizCreate'] = None
+
+class CourseUpdateFull(CourseUpdate):
+    roles: Optional[List[uuid.UUID]] = None
+    users: Optional[List[uuid.UUID]] = None
+    quiz: Optional['QuizUpdate'] = None
+
+class CourseUserProgress(BaseModel):
+    user: UserPublic
+    status: CourseStatusEnum
+    attempt_count: int
+    quiz_score: Optional[int] = None
+
 class CourseDetailed(CoursePublic):
     roles: List[RolePublic] = []
     users: List[UserPublic] = []
     quiz: Optional['QuizPublic'] = None
 
 class Course(CourseBase, table=True):
-    """The actual Course table model."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
     # Many-to-many with Roles

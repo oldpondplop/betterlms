@@ -1,10 +1,12 @@
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence, Type
 from uuid import UUID
-from sqlmodel import Session, select
+from sqlmodel import SQLModel, Session, select
 from fastapi import HTTPException
 from sqlalchemy import func
 
 from app.models import (
+    CourseRoleLink,
+    CourseUserLink,
     User,
     UserCreate,
     UserUpdate,
@@ -15,7 +17,10 @@ from app.models import (
     RoleUpdate,
     Course,
     CourseCreate,
-    CourseUpdate
+    CourseUpdate,
+    Quiz,
+    QuizUpdate,
+    QuizCreate
 )
 from app.core.security import verify_password, get_password_hash 
 
@@ -77,15 +82,6 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
     session.refresh(db_user)
     return db_user
 
-def delete_user(session: Session, user_id: UUID) -> User:
-    """Delete a User by ID."""
-    db_user = get_user_by_id(session, user_id)
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    session.delete(db_user)
-    session.commit()
-    return db_user
-
 
 #
 # ===========================
@@ -120,8 +116,7 @@ def create_role(session: Session, role_in: RoleCreate) -> Role:
 
 def update_role(session: Session, db_role: Role, role_in: RoleUpdate) -> Role:
     update_data = role_in.model_dump(exclude_unset=True)
-    for field_name, value in update_data.items():
-        setattr(db_role, field_name, value)
+    db_role.sqlmodel_update(update_data)
     session.add(db_role)
     session.commit()
     session.refresh(db_role)
@@ -137,7 +132,7 @@ def delete_role(session: Session, role_id: UUID) -> Role:
 
 
 # ===========================
-#  Example: COURSE CRUD
+#  COURSE CRUD
 # ===========================
 
 def get_course_by_id(session: Session, course_id: UUID) -> Optional[Course]:
@@ -158,7 +153,6 @@ def create_course(session: Session, course_create: CourseCreate) -> Course:
     return db_course
 
 def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
-    """Partially update an existing Course."""
     course_data = course_in.model_dump(exclude_unset=True)
     db_course.sqlmodel_update(course_data)
 
@@ -166,28 +160,41 @@ def update_course(session: Session, db_course: Course, course_in: CourseUpdate) 
     session.commit()
     session.refresh(db_course)
     return db_course
-'''
-def create_quiz(*, session: Session, quiz_create: QuizCreate) -> Quiz:
-    """
-    Create a new Quiz from QuizCreate schema.
-    The 'course_id' is required in the QuizCreate model.
-    """
-    db_quiz = Quiz.model_validate(quiz_create)
+
+def add_course_material(session: Session, db_course: Course, file_name: str) -> Course:
+    if file_name not in db_course.materials:
+        db_course.materials.append(file_name)
+    session.add(db_course)
+    session.commit()
+    session.refresh(db_course)
+    return db_course
+
+def remove_course_material(session: Session, db_course: Course, file_name: str) -> Course:
+    if file_name in db_course.materials:
+        db_course.materials.remove(file_name)
+        session.add(db_course)
+        session.commit()
+        session.refresh(db_course)
+    return db_course
+
+
+# ===========================
+#  Quiz CRUD
+# ===========================
+
+def create_quiz(session: Session, quiz_in: QuizCreate, course_id: Optional[UUID] = None) -> Quiz:
+    db_quiz = Quiz.model_validate(quiz_in)
+    if course_id:
+        db_quiz.course_id = course_id
     session.add(db_quiz)
     session.commit()
     session.refresh(db_quiz)
     return db_quiz
 
-def update_quiz(*, session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
-    """
-    Partially update an existing Quiz with QuizUpdate.
-    Fields like 'course_id', 'max_attempts', 'passing_threshold', 'questions'
-    can be changed if your business logic allows.
-    """
+def update_quiz(session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
     quiz_data = quiz_in.model_dump(exclude_unset=True)
     db_quiz.sqlmodel_update(quiz_data)
     session.add(db_quiz)
     session.commit()
     session.refresh(db_quiz)
     return db_quiz
-'''
