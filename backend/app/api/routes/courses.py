@@ -3,9 +3,9 @@ from typing import Any, List
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser
+from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser, SuperuserRequired
 from app.models import (
     Course,
     CourseCreate,
@@ -35,12 +35,12 @@ def get_course_by_id(session: SessionDep, course_id: UUID) -> Course:
 # Create Course
 @router.post("/", response_model=CoursePublic)
 def create_course(
-    *, session: SessionDep, admin_user: CurrentSuperUser, course_in: CourseCreate
+    *, session: SessionDep, admin_user: CurrentSuperUser, course_create: CourseCreate
 ) -> Any:
     """
     Create a new course. Only accessible by superusers.
     """
-    course = crud.create_course(session=session, course_in=course_in)
+    course = crud.create_course(session=session, course_create=course_create)
     return course
 
 
@@ -163,29 +163,18 @@ def assign_role_to_course(
 
     return Message(message="Role assigned to course successfully")
 
-@router.delete("/{course_id}/remove-role/{role_id}", response_model=Message)
-def remove_role_from_course(
-    *,
-    session: SessionDep,
-    course_id: uuid.UUID,
-    role_id: uuid.UUID,
-    admin_user: CurrentSuperUser,
-) -> Message:
-    """
-    Remove a role from a course. Only accessible by superusers.
-    """
-    # Check if the link exists
-    link = session.exec(
-        select(CourseRoleLink).where(
-            CourseRoleLink.course_id == course_id,
-            CourseRoleLink.role_id == role_id,
-        )
-    ).first()
-    if not link:
-        raise HTTPException(status_code=404, detail="Role not assigned to this course")
+@router.delete("/{course_id}/remove-role/{role_id}", response_model=Message, dependencies=[SuperuserRequired])
+def unassign_role_from_course(course_id: UUID,role_id: UUID, session: SessionDep) -> Any:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
 
-    # Delete the link
-    session.delete(link)
+    db_role = session.get(Role, role_id)
+    if not db_role or db_role not in db_course.roles:
+        raise HTTPException(status_code=404, detail="Role not linked to course")
+    
+    db_course.roles.remove(db_role)
+    session.add(db_course)
     session.commit()
-
+    session.refresh(db_course)
     return Message(message="Role removed from course successfully")

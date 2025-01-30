@@ -218,12 +218,12 @@ export type CoursesAssignRoleToCourseData = {
 
 export type CoursesAssignRoleToCourseResponse = Message
 
-export type CoursesRemoveRoleFromCourseData = {
+export type CoursesUnassignRoleFromCourseData = {
   courseId: string
   roleId: string
 }
 
-export type CoursesRemoveRoleFromCourseResponse = Message
+export type CoursesUnassignRoleFromCourseResponse = Message
 
 export type LoginLoginAccessTokenData = {
   formData: Body_login_login_access_token
@@ -316,12 +316,12 @@ export type UsersUpdatePasswordMeData = {
 
 export type UsersUpdatePasswordMeResponse = Message
 
-export type UsersReadUsersData = {
+export type UsersGetUsersData = {
   limit?: number
   skip?: number
 }
 
-export type UsersReadUsersResponse = UsersPublic
+export type UsersGetUsersResponse = UsersPublic
 
 export type UsersCreateUserData = {
   requestBody: UserCreate

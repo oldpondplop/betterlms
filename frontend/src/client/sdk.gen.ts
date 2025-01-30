@@ -18,8 +18,8 @@ import type {
   CoursesAttachQuizToCourseResponse,
   CoursesAssignRoleToCourseData,
   CoursesAssignRoleToCourseResponse,
-  CoursesRemoveRoleFromCourseData,
-  CoursesRemoveRoleFromCourseResponse,
+  CoursesUnassignRoleFromCourseData,
+  CoursesUnassignRoleFromCourseResponse,
   LoginLoginAccessTokenData,
   LoginLoginAccessTokenResponse,
   LoginTestTokenResponse,
@@ -50,8 +50,8 @@ import type {
   UsersUpdateUserMeResponse,
   UsersUpdatePasswordMeData,
   UsersUpdatePasswordMeResponse,
-  UsersReadUsersData,
-  UsersReadUsersResponse,
+  UsersGetUsersData,
+  UsersGetUsersResponse,
   UsersCreateUserData,
   UsersCreateUserResponse,
   UsersReadUserByIdData,
@@ -235,17 +235,16 @@ export class CoursesService {
   }
 
   /**
-   * Remove Role From Course
-   * Remove a role from a course. Only accessible by superusers.
+   * Unassign Role From Course
    * @param data The data for the request.
    * @param data.courseId
    * @param data.roleId
    * @returns Message Successful Response
    * @throws ApiError
    */
-  public static removeRoleFromCourse(
-    data: CoursesRemoveRoleFromCourseData,
-  ): CancelablePromise<CoursesRemoveRoleFromCourseResponse> {
+  public static unassignRoleFromCourse(
+    data: CoursesUnassignRoleFromCourseData,
+  ): CancelablePromise<CoursesUnassignRoleFromCourseResponse> {
     return __request(OpenAPI, {
       method: "DELETE",
       url: "/api/v1/courses/{course_id}/remove-role/{role_id}",
@@ -617,16 +616,16 @@ export class UsersService {
   }
 
   /**
-   * Read Users
+   * Get Users
    * @param data The data for the request.
    * @param data.skip
    * @param data.limit
    * @returns UsersPublic Successful Response
    * @throws ApiError
    */
-  public static readUsers(
-    data: UsersReadUsersData = {},
-  ): CancelablePromise<UsersReadUsersResponse> {
+  public static getUsers(
+    data: UsersGetUsersData = {},
+  ): CancelablePromise<UsersGetUsersResponse> {
     return __request(OpenAPI, {
       method: "GET",
       url: "/api/v1/users/",
