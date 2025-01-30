@@ -49,3 +49,4 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
     return current_user
 
 CurrentSuperUser = Annotated[User, Depends(get_current_active_superuser)]
+SuperuserRequired = Depends(get_current_active_superuser)

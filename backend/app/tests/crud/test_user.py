@@ -7,14 +7,14 @@ from sqlmodel import Session, select
 
 from app import crud
 from app.core.security import get_password_hash, verify_password
-from app.models import UpdatePassword, User, UserCreate, UserUpdate, RoleEnum, UserUpdateMe
-from app.tests.utils.utils import random_email, random_lower_string, random_role
+from app.models import UpdatePassword, User, UserCreate, UserUpdate, UserUpdateMe
+from app.tests.utils.utils import random_email, random_lower_string, random_name, random_role
 
 
 def test_authenticate_user(db: Session) -> None:
     """Test if a user can authenticate with correct credentials."""
-    user_in = get_random_employee()
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = get_random_employee(db)
+    user = crud.create_user(session=db, user_in=user_in)
 
     authenticated_user = crud.authenticate_user(session=db, email=user_in.email, password=user_in.password)
 
@@ -31,46 +31,54 @@ def test_not_authenticate_user(db: Session) -> None:
 
 def test_check_if_user_is_active(db: Session) -> None:
     email = random_email()
+    name = random_name()
+    role = random_role(db)
     password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = UserCreate(name=name, email=email, role_id=role, password=password)
+    user = crud.create_user(session=db, user_in=user_in)
     assert user.is_active is True
 
 
 def test_check_if_user_is_active_inactive(db: Session) -> None:
     email = random_email()
+    name = random_name()
     password = random_lower_string()
-    user_in = UserCreate(email=email, password=password, disabled=True)
-    user = crud.create_user(session=db, user_create=user_in)
+    role = random_role(db)
+    user_in = UserCreate(name=name, email=email, role_id=role, password=password, disabled=True)
+    user = crud.create_user(session=db, user_in=user_in)
     assert user.is_active
 
 
 def test_check_if_user_is_superuser(db: Session) -> None:
     email = random_email()
+    name = random_name()
+    role = random_role(db)
     password = random_lower_string()
-    user_in = UserCreate(email=email, password=password, is_superuser=True)
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = UserCreate(name=name, email=email, role_id=role, password=password, is_superuser=True)
+    user = crud.create_user(session=db, user_in=user_in)
     assert user.is_superuser is True
 
 
 def test_check_if_user_is_superuser_normal_user(db: Session) -> None:
     username = random_email()
+    name = random_name()
+    role = random_role(db)
     password = random_lower_string()
-    user_in = UserCreate(email=username, password=password)
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = UserCreate(name=name, email=username, role_id=role, password=password)
+    user = crud.create_user(session=db, user_in=user_in)
     assert user.is_superuser is False
 
 
 def test_check_if_normal_user_is_not_superuser(db: Session) -> None:
-    user_in = get_random_employee()
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = get_random_employee(db)
+    user = crud.create_user(session=db, user_in=user_in)
 
     assert user.is_superuser is False
 
 
 def test_get_user(db: Session) -> None:
-    user_in = get_random_employee()
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = get_random_employee(db)
+    user = crud.create_user(session=db, user_in=user_in)
 
     user_2 = db.get(User, user.id)
     
@@ -81,7 +89,7 @@ def test_get_user(db: Session) -> None:
 
 def test_update_user_me(db: Session) -> None:
     """Test updating a user's name & email."""
-    user = crud.create_user(session=db, user_create=get_random_employee())
+    user = crud.create_user(session=db, user_in=get_random_employee(db))
 
     update_data = UserUpdateMe(name="Updated Name", email=random_email())
     updated_user = crud.update_user_me(session=db, db_user=user, user_in=update_data)
@@ -92,8 +100,8 @@ def test_update_user_me(db: Session) -> None:
 
 def test_update_user_me_email_conflict(db: Session) -> None:
     """Test that a user cannot update their email to an already used one."""
-    user1 = crud.create_user(session=db, user_create=get_random_employee())
-    user2 = crud.create_user(session=db, user_create=get_random_employee())
+    user1 = crud.create_user(session=db, user_in=get_random_employee(db))
+    user2 = crud.create_user(session=db, user_in=get_random_employee(db))
 
     old_email = user2.email  # Save old email before trying update
     update_data = UserUpdateMe(email=user1.email)
@@ -115,8 +123,8 @@ def test_update_user_me_email_conflict(db: Session) -> None:
 
 def test_update_password_me(db: Session) -> None:
     """Test updating a user's password."""
-    user_in = get_random_employee()
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = get_random_employee(db)
+    user = crud.create_user(session=db, user_in=user_in)
 
     old_password = user.hashed_password
     new_password = random_lower_string()
@@ -130,7 +138,7 @@ def test_update_password_me(db: Session) -> None:
 
 def test_update_password_me_wrong_current_password(db: Session) -> None:
     """Test that password update fails when the current password is incorrect."""
-    user = crud.create_user(session=db, user_create=get_random_employee())
+    user = crud.create_user(session=db, user_in=get_random_employee(db))
 
     new_password = random_lower_string()
     wrong_password_update = UpdatePassword(current_password="wrong_password", new_password=new_password)
@@ -147,22 +155,22 @@ def test_update_password_me_wrong_current_password(db: Session) -> None:
 
 def test_create_user_duplicate_email(db: Session) -> None:
     """Test that creating a user with an existing email fails."""
-    user_in = get_random_employee()
-    user1 = crud.create_user(session=db, user_create=user_in)
-
+    user_in = get_random_employee(db)
+    user1 = crud.create_user(session=db, user_in=user_in)
+    print(user1)
     user_in.user_id = "EMP9999"
 
     with pytest.raises(Exception):
-        crud.create_user(session=db, user_create=user_in)
-    
+        user2 = crud.create_user(session=db, user_in=user_in)
+        print(user2)
     db.rollback() 
     users = db.exec(select(User).where(User.email == user1.email)).all()
     assert len(users) == 1
 
 def test_delete_user(db: Session) -> None:
     """Test deleting a user from the database."""
-    user_in = get_random_employee()
-    user = crud.create_user(session=db, user_create=user_in)
+    user_in = get_random_employee(db)
+    user = crud.create_user(session=db, user_in=user_in)
 
     db.delete(user)
     db.commit()
@@ -172,16 +180,13 @@ def test_delete_user(db: Session) -> None:
 
 
 def test_assign_user_random_role(db: Session) -> None:
-    user_in = get_random_employee()
-    user_in.role_name = random_role()
-    user = crud.create_user(session=db, user_create=user_in)
-
-    assert user.role_name in RoleEnum
-
+    user_in = get_random_employee(db)
+    user_in.role_id = random_role(db)
+    user = crud.create_user(session=db, user_in=user_in)
+    assert user.role_id == user_in.role_id
 
 def test_check_admin_role(db: Session) -> None:
-    user_in = get_random_employee()
-    user_in.role_name = RoleEnum.ADMIN
-    user = crud.create_user(session=db, user_create=user_in)
-
-    assert user.role_name == RoleEnum.ADMIN
+    user_in = get_random_employee(db)
+    user_in.role_id = None
+    user = crud.create_user(session=db, user_in=user_in)
+    assert user.role is None

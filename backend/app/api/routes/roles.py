@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlmodel import select
 from typing import Annotated, Any
-from app.api.deps import CurrentSuperUser, SessionDep, get_current_active_superuser
+from app.api.deps import SessionDep, get_current_active_superuser
 from app.models import (
     Course, CoursesPublic, Message, Role, RoleCreate, RolePublic, RoleUpdate, 
     RolesPublic, User, UsersPublic, CourseRoleLink

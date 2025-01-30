@@ -1,39 +1,24 @@
-# app/crud.py
-
-import uuid
-from typing import List, Optional, Protocol, Set, Sequence, Type, TypeVar
-
+from typing import Optional, Sequence
+from uuid import UUID
+from sqlmodel import Session, select
 from fastapi import HTTPException
-from sqlalchemy import UUID, func
-from sqlmodel import SQLModel, Session, select
-from app.core.security import get_password_hash, verify_password
+from sqlalchemy import func
+
 from app.models import (
-    Role,
-    RoleCreate,
-    RoleUpdate,
-    UpdatePassword,
     User,
     UserCreate,
     UserUpdate,
+    UserUpdateMe,
+    UpdatePassword,
+    Role,
+    RoleCreate,
+    RoleUpdate,
     Course,
     CourseCreate,
-    CourseUpdate,
-    Quiz,
-    QuizCreate,
-    QuizUpdate,
-    QuizAttempt,
-    UserUpdateMe,
+    CourseUpdate
 )
+from app.core.security import verify_password, get_password_hash 
 
-
-
-class HasUUID(Protocol):
-    id: uuid.UUID
-
-T = TypeVar("T", bound=HasUUID)
-def get_by_uuid(db: Session, model: type[T], id: str | uuid.UUID) -> Optional[T]:
-    """Fetch a record by UUID, converting string UUIDs."""
-    return db.exec(select(model).where(model.id == uuid.UUID(str(id)))).first()
 
 # ===========================
 #  USER CRUD
@@ -101,9 +86,7 @@ def delete_user(session: Session, user_id: UUID) -> User:
     session.commit()
     return db_user
 
-def get_total_count(session: Session, model: type[SQLModel]) -> int:
-    """Get total count of records for any SQLModel."""
-    return session.exec(select(func.count()).select_from(model)).one()
+
 #
 # ===========================
 #  ROLE CRUD
@@ -183,40 +166,28 @@ def update_course(session: Session, db_course: Course, course_in: CourseUpdate) 
     session.commit()
     session.refresh(db_course)
     return db_course
-
-#
-# =========  Course CRUD  =========
-#
-
-def create_course(session: Session, course_in: CourseCreate) -> Course:
-    db_course = Course.model_validate(course_in)
-    session.add(db_course)
+'''
+def create_quiz(*, session: Session, quiz_create: QuizCreate) -> Quiz:
+    """
+    Create a new Quiz from QuizCreate schema.
+    The 'course_id' is required in the QuizCreate model.
+    """
+    db_quiz = Quiz.model_validate(quiz_create)
+    session.add(db_quiz)
     session.commit()
-    session.refresh(db_course)
-    return db_course
+    session.refresh(db_quiz)
+    return db_quiz
 
-def get_courses(session: Session, skip: int = 0, limit: int = 100) -> List[Course]:
-    courses = session.exec(select(Course).offset(skip).limit(limit)).all()
-    return courses
-
-def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
-    course_data = course_in.dict(exclude_unset=True)
-    for key, value in course_data.items():
-        setattr(db_course, key, value)
-    session.add(db_course)
+def update_quiz(*, session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
+    """
+    Partially update an existing Quiz with QuizUpdate.
+    Fields like 'course_id', 'max_attempts', 'passing_threshold', 'questions'
+    can be changed if your business logic allows.
+    """
+    quiz_data = quiz_in.model_dump(exclude_unset=True)
+    db_quiz.sqlmodel_update(quiz_data)
+    session.add(db_quiz)
     session.commit()
-    session.refresh(db_course)
-    return db_course
-
-def delete_course(session: Session, db_course: Course) -> None:
-    session.delete(db_course)
-    session.commit()
-
-def attach_quiz_to_course(session: Session, db_course: Course, quiz_id: UUID) -> Course:
-    db_course.quiz_id = quiz_id
-    session.add(db_course)
-    session.commit()
-    session.refresh(db_course)
-    return db_course
-
-# =========  Quiz CRUD  =========
+    session.refresh(db_quiz)
+    return db_quiz
+'''

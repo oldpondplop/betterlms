@@ -1,9 +1,7 @@
 #!/bin/bash
 
-set -e 
-# set -x
-
-./generate-client.sh
+set -e  # Exit on error
+# set -x  # Uncomment to debug
 
 # Function to clean up background processes
 cleanup() {
@@ -17,19 +15,42 @@ cleanup() {
 # Trap SIGINT (Ctrl+C) and SIGTERM (for graceful shutdown)
 trap cleanup SIGINT SIGTERM
 
+# Check for "--reset-db" argument
+RESET_DB=false
+if [[ "$1" == "--reset-db" ]]; then
+    RESET_DB=true
+fi
+
+./generate-client.sh
+
 # Start Backend
 cd backend || exit 1
 source .venv/bin/activate
+
+if $RESET_DB; then
+    echo "🔄 Resetting database..."
+    rm -f data/app.db  # Delete the SQLite database file
+fi
+
 echo "Initializing database..."
 python -c "from app.core.db import init_db; init_db()"
 echo "Database initialization complete."
-uvicorn app.main:app --host 0.0.0.0 --port 8000 &  # Run in background
+
+# Populate database if --reset-db was provided
+if $RESET_DB; then
+    echo "🚀 Populating database..."
+    python populate_db.py
+    echo "✅ Database populated successfully."
+fi
+
+# Start backend in the background
+uvicorn app.main:app --host 0.0.0.0 --port 8000 &  
 BACKEND_PID=$!  # Store backend PID
 cd ..
 
 # Start Frontend
 cd frontend || exit 1
-npm run dev -- --host=0.0.0.0 --port=5173 &  # Run in background
+npm run dev -- --host=0.0.0.0 --port=5173 &  
 FRONTEND_PID=$!  # Store frontend PID
 cd ..
 
