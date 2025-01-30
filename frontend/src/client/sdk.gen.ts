@@ -31,6 +31,30 @@ import type {
   LoginRecoverPasswordHtmlContentResponse,
   PrivateCreateUserData,
   PrivateCreateUserResponse,
+  QuizzesCreateQuizData,
+  QuizzesCreateQuizResponse,
+  QuizzesReadQuizzesData,
+  QuizzesReadQuizzesResponse,
+  QuizzesReadQuizData,
+  QuizzesReadQuizResponse,
+  QuizzesUpdateQuizData,
+  QuizzesUpdateQuizResponse,
+  QuizzesDeleteQuizData,
+  QuizzesDeleteQuizResponse,
+  QuizzesSubmitQuizAttemptData,
+  QuizzesSubmitQuizAttemptResponse,
+  QuizzesGetQuizAttemptsData,
+  QuizzesGetQuizAttemptsResponse,
+  QuizzesGetQuizStatsData,
+  QuizzesGetQuizStatsResponse,
+  QuizzesGetQuizAnalyticsData,
+  QuizzesGetQuizAnalyticsResponse,
+  QuizzesGetQuizAnalytics1Data,
+  QuizzesGetQuizAnalytics1Response,
+  QuizzesGetQuestionsAnalysisData,
+  QuizzesGetQuestionsAnalysisResponse,
+  QuizzesGetCourseQuizProgressData,
+  QuizzesGetCourseQuizProgressResponse,
   RolesGetRolesResponse,
   RolesCreateRoleData,
   RolesCreateRoleResponse,
@@ -381,6 +405,297 @@ export class PrivateService {
       url: "/api/v1/private/users/",
       body: data.requestBody,
       mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+}
+
+export class QuizzesService {
+  /**
+   * Create Quiz
+   * Create a new quiz. Only accessible by superusers.
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static createQuiz(
+    data: QuizzesCreateQuizData,
+  ): CancelablePromise<QuizzesCreateQuizResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/quizzes/",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Read Quizzes
+   * Get all quizzes with pagination.
+   * @param data The data for the request.
+   * @param data.skip
+   * @param data.limit
+   * @returns QuizzesPublic Successful Response
+   * @throws ApiError
+   */
+  public static readQuizzes(
+    data: QuizzesReadQuizzesData = {},
+  ): CancelablePromise<QuizzesReadQuizzesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/",
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Read Quiz
+   * Get quiz details.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static readQuiz(
+    data: QuizzesReadQuizData,
+  ): CancelablePromise<QuizzesReadQuizResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/{quiz_id}",
+      path: {
+        quiz_id: data.quizId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Quiz
+   * Update quiz details. Only accessible by superusers.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @param data.requestBody
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static updateQuiz(
+    data: QuizzesUpdateQuizData,
+  ): CancelablePromise<QuizzesUpdateQuizResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/quizzes/{quiz_id}",
+      path: {
+        quiz_id: data.quizId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Delete Quiz
+   * Delete a quiz. Only accessible by superusers.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteQuiz(
+    data: QuizzesDeleteQuizData,
+  ): CancelablePromise<QuizzesDeleteQuizResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/quizzes/{quiz_id}",
+      path: {
+        quiz_id: data.quizId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Submit Quiz Attempt
+   * Submit a quiz attempt.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @param data.requestBody
+   * @returns QuizAttemptPublic Successful Response
+   * @throws ApiError
+   */
+  public static submitQuizAttempt(
+    data: QuizzesSubmitQuizAttemptData,
+  ): CancelablePromise<QuizzesSubmitQuizAttemptResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/quizzes/{quiz_id}/attempt",
+      path: {
+        quiz_id: data.quizId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Quiz Attempts
+   * Get all attempts for a quiz by the current user.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @param data.skip
+   * @param data.limit
+   * @returns QuizAttemptPublic Successful Response
+   * @throws ApiError
+   */
+  public static getQuizAttempts(
+    data: QuizzesGetQuizAttemptsData,
+  ): CancelablePromise<QuizzesGetQuizAttemptsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/{quiz_id}/attempts",
+      path: {
+        quiz_id: data.quizId,
+      },
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Quiz Stats
+   * Get quiz statistics for the current user.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static getQuizStats(
+    data: QuizzesGetQuizStatsData,
+  ): CancelablePromise<QuizzesGetQuizStatsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/{quiz_id}/stats",
+      path: {
+        quiz_id: data.quizId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Quiz Analytics
+   * Get comprehensive analytics for a quiz. Admin only.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static getQuizAnalytics(
+    data: QuizzesGetQuizAnalyticsData,
+  ): CancelablePromise<QuizzesGetQuizAnalyticsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/{quiz_id}/analytics",
+      path: {
+        quiz_id: data.quizId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Quiz Analytics
+   * Get comprehensive analytics for a quiz. Admin only.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static getQuizAnalytics1(
+    data: QuizzesGetQuizAnalytics1Data,
+  ): CancelablePromise<QuizzesGetQuizAnalytics1Response> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/course/{course_id}",
+      query: {
+        quiz_id: data.quizId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Questions Analysis
+   * Get analysis for each question in the quiz. Admin only.
+   * @param data The data for the request.
+   * @param data.quizId
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static getQuestionsAnalysis(
+    data: QuizzesGetQuestionsAnalysisData,
+  ): CancelablePromise<QuizzesGetQuestionsAnalysisResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/{quiz_id}/questions/analysis",
+      path: {
+        quiz_id: data.quizId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course Quiz Progress
+   * Get quiz progress statistics for a course. Admin only.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static getCourseQuizProgress(
+    data: QuizzesGetCourseQuizProgressData,
+  ): CancelablePromise<QuizzesGetCourseQuizProgressResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/course/{course_id}/progress",
+      path: {
+        course_id: data.courseId,
+      },
       errors: {
         422: "Validation Error",
       },

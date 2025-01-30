@@ -1,0 +1,240 @@
+.
+├── README.md
+├── backend
+│   ├── README.md
+│   ├── __pycache__
+│   │   └── __init__.cpython-310.pyc
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── crud.cpython-310.pyc
+│   │   │   ├── main.cpython-310.pyc
+│   │   │   ├── models.cpython-310.pyc
+│   │   │   └── utils.cpython-310.pyc
+│   │   ├── alembic
+│   │   │   └── __pycache__
+│   │   │       └── env.cpython-310.pyc
+│   │   ├── api
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── deps.cpython-310.pyc
+│   │   │   │   └── main.cpython-310.pyc
+│   │   │   ├── deps.py
+│   │   │   ├── main.py
+│   │   │   └── routes
+│   │   │       ├── __init__.py
+│   │   │       ├── __pycache__
+│   │   │       │   ├── __init__.cpython-310.pyc
+│   │   │       │   ├── courses.cpython-310.pyc
+│   │   │       │   ├── items.cpython-310.pyc
+│   │   │       │   ├── login.cpython-310.pyc
+│   │   │       │   ├── private.cpython-310.pyc
+│   │   │       │   ├── quiz.cpython-310.pyc
+│   │   │       │   ├── quizzes.cpython-310.pyc
+│   │   │       │   ├── roles.cpython-310.pyc
+│   │   │       │   ├── users.cpython-310.pyc
+│   │   │       │   └── utils.cpython-310.pyc
+│   │   │       ├── courses.py
+│   │   │       ├── items.py
+│   │   │       ├── login.py
+│   │   │       ├── private.py
+│   │   │       ├── quizzes.py
+│   │   │       ├── roles.py
+│   │   │       ├── users.py
+│   │   │       └── utils.py
+│   │   ├── core
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── config.cpython-310.pyc
+│   │   │   │   ├── db.cpython-310.pyc
+│   │   │   │   ├── security.cpython-310.pyc
+│   │   │   │   └── session.cpython-310.pyc
+│   │   │   ├── config.py
+│   │   │   ├── db.py
+│   │   │   └── security.py
+│   │   ├── crud.py
+│   │   ├── email-templates
+│   │   │   ├── build
+│   │   │   │   ├── new_account.html
+│   │   │   │   ├── reset_password.html
+│   │   │   │   └── test_email.html
+│   │   │   └── src
+│   │   │       ├── new_account.mjml
+│   │   │       ├── reset_password.mjml
+│   │   │       └── test_email.mjml
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── schema
+│   │   ├── services
+│   │   ├── tests
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   └── __init__.cpython-310.pyc
+│   │   │   ├── api
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── routes
+│   │   │   │       ├── __init__.py
+│   │   │   │       ├── test_items.py
+│   │   │   │       ├── test_login.py
+│   │   │   │       ├── test_private.py
+│   │   │   │       └── test_users.py
+│   │   │   ├── conftest.py
+│   │   │   ├── crud
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_user.py
+│   │   │   ├── scripts
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_backend_pre_start.py
+│   │   │   │   └── test_test_pre_start.py
+│   │   │   └── utils
+│   │   │       ├── __init__.py
+│   │   │       ├── __pycache__
+│   │   │       │   ├── __init__.cpython-310.pyc
+│   │   │       │   ├── course.cpython-310.pyc
+│   │   │       │   ├── user.cpython-310.pyc
+│   │   │       │   └── utils.cpython-310.pyc
+│   │   │       ├── course.py
+│   │   │       ├── item.py
+│   │   │       ├── user.py
+│   │   │       └── utils.py
+│   │   └── utils.py
+│   ├── data
+│   │   ├── app.db
+│   │   └── course
+│   │       └── materials
+│   │           ├── 044c8804f93a48a896524ea5e91f0796_c175094d-0bf1-4702-b867-1c438131e70c.jpg
+│   │           ├── 11ebd9800a064405936b25050ae208fa_Cazanescu Rares CV.pdf
+│   │           ├── 271470a4830c43f3971b230f77ea0c1b_Legisl.muncii.2024.pdf
+│   │           ├── 28db78c8bbd44e468dbe597eed870dbb_Legisl.muncii.2024.pdf
+│   │           ├── 4495d63485fd4b32a044f97557b6b11d_Legisl.muncii.2024.pdf
+│   │           ├── abe6f777779747eb8e7dc2474e79ecb8_Cazanescu Rares CV (2).pdf
+│   │           ├── bad6804d8e6840e784fc83f7197b61f9_Cazanescu Rares CV.pdf
+│   │           ├── c955fc181c0044bba3a43654ee40740e_Blue Simple Professional CV Resume.pdf
+│   │           ├── ca76d1c93c5a4623befaf315de48045a_Legisl.muncii.2024.pdf
+│   │           ├── cdf97eb2dcde40bf9b4e27eabc805aea_Legisl.muncii.2024.pdf
+│   │           ├── d693cfdd101b4506b49fca4c51cc666c_Cazanescu Rares CV.pdf
+│   │           └── f2b09cd4367749339201268070e735ab_Legisl.muncii.2024.pdf
+│   ├── populate_db.py
+│   ├── pyproject.toml
+│   ├── pytest.ini
+│   ├── scripts
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       └── initialize_data.cpython-310.pyc
+│   ├── uploads
+│   └── uv.lock
+├── bigTree.txt
+├── frontend
+│   ├── biome.json
+│   ├── index.html
+│   ├── openapi-ts.config.ts
+│   ├── openapi.json
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── playwright.config.ts
+│   ├── public
+│   │   └── assets
+│   │       └── images
+│   │           ├── fastapi-logo.svg
+│   │           └── favicon.png
+│   ├── src
+│   │   ├── client
+│   │   │   ├── core
+│   │   │   │   ├── ApiError.ts
+│   │   │   │   ├── ApiRequestOptions.ts
+│   │   │   │   ├── ApiResult.ts
+│   │   │   │   ├── CancelablePromise.ts
+│   │   │   │   ├── OpenAPI.ts
+│   │   │   │   └── request.ts
+│   │   │   ├── index.ts
+│   │   │   ├── schemas.gen.ts
+│   │   │   ├── sdk.gen.ts
+│   │   │   └── types.gen.ts
+│   │   ├── components
+│   │   │   ├── Admin
+│   │   │   │   ├── AddUser.tsx
+│   │   │   │   ├── AssignRole.tsx
+│   │   │   │   ├── DeleteUser.tsx
+│   │   │   │   └── EditUser.tsx
+│   │   │   ├── Common
+│   │   │   │   ├── ActionsMenu.tsx
+│   │   │   │   ├── Navbar.tsx
+│   │   │   │   ├── NotFound.tsx
+│   │   │   │   ├── PaginationFooter.tsx
+│   │   │   │   ├── Sidebar.tsx
+│   │   │   │   ├── SidebarItems.tsx
+│   │   │   │   └── UserMenu.tsx
+│   │   │   ├── Course
+│   │   │   │   ├── AddCourse.tsx
+│   │   │   │   ├── DeleteCourse.tsx
+│   │   │   │   └── EditCourse.tsx
+│   │   │   ├── Quiz
+│   │   │   │   ├── AddQuiz.tsx
+│   │   │   │   ├── DeleteQuiz.tsx
+│   │   │   │   └── EditQuiz.tsx
+│   │   │   ├── Role
+│   │   │   │   ├── AddRole.tsx
+│   │   │   │   ├── DeleteRole.tsx
+│   │   │   │   └── EditRole.tsx
+│   │   │   └── UserSettings
+│   │   │       ├── Appearance.tsx
+│   │   │       ├── ChangePassword.tsx
+│   │   │       ├── DeleteAccount.tsx
+│   │   │       ├── DeleteConfirmation.tsx
+│   │   │       └── UserInformation.tsx
+│   │   ├── hooks
+│   │   │   ├── useAuth.ts
+│   │   │   └── useCustomToast.ts
+│   │   ├── main.tsx
+│   │   ├── routeTree.gen.ts
+│   │   ├── routes
+│   │   │   ├── __root.tsx
+│   │   │   ├── _layout
+│   │   │   │   ├── admin.tsx
+│   │   │   │   ├── course.tsx
+│   │   │   │   ├── index.tsx
+│   │   │   │   ├── quiz.tsx
+│   │   │   │   ├── role.tsx
+│   │   │   │   └── settings.tsx
+│   │   │   ├── _layout.tsx
+│   │   │   ├── login.tsx
+│   │   │   ├── recover-password.tsx
+│   │   │   ├── reset-password.tsx
+│   │   │   └── signup.tsx
+│   │   ├── theme.tsx
+│   │   ├── utils.ts
+│   │   └── vite-env.d.ts
+│   ├── tests
+│   │   ├── auth.setup.ts
+│   │   ├── config.ts
+│   │   ├── login.spec.ts
+│   │   ├── reset-password.spec.ts
+│   │   ├── sign-up.spec.ts
+│   │   ├── user-settings.spec.ts
+│   │   └── utils
+│   │       ├── mailcatcher.ts
+│   │       ├── privateApi.ts
+│   │       ├── random.ts
+│   │       └── user.ts
+│   ├── tsconfig.build.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+├── generate-client.sh
+├── img
+│   ├── dashboard-create.png
+│   ├── dashboard-dark.png
+│   ├── dashboard-items.png
+│   ├── dashboard-user-settings.png
+│   ├── dashboard.png
+│   ├── docs.png
+│   ├── github-social-preview.png
+│   ├── github-social-preview.svg
+│   └── login.png
+├── start.sh
+└── tree2.0.txt
+
+51 directories, 186 files

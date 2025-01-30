@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser
 from app.models import (
-    Quiz, QuizCreate, QuizPublic, QuizUpdate,
+    Course, Quiz, QuizCreate, QuizPublic, QuizUpdate,
     QuizAttempt, QuizAttemptCreate, QuizAttemptPublic, QuizzesPublic,
     Message
 )
@@ -20,6 +20,12 @@ def create_quiz(
     admin_user: CurrentSuperUser,
 ) -> Any:
     """Create a new quiz. Only accessible by superusers."""
+
+    # Ensure the course exists before creating the quiz
+    course = session.get(Course, quiz_create.course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
     return crud.create_quiz(session=session, quiz_create=quiz_create)
 
 @router.get("/", response_model=QuizzesPublic)

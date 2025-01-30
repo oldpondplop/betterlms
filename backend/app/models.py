@@ -202,7 +202,8 @@ class QuizQuestion(SQLModel):
 class QuizBase(SQLModel):
     max_attempts: int = Field(default=3)
     passing_threshold: int = Field(default=70)
-    questions: List[QuizQuestion] = Field(default_factory=list, sa_column=Column(JSON))
+    questions: List[dict] = Field(default_factory=list, sa_column=Column(JSON))
+
 
 class QuizCreate(QuizBase):
     course_id: uuid.UUID

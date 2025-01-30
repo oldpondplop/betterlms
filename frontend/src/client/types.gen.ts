@@ -76,10 +76,30 @@ export type PrivateUserCreate = {
   is_superuser?: boolean
 }
 
+export type QuizAttemptPublic = {
+  score: number
+  attempt_number: number
+  passed?: boolean
+  id: string
+  quiz_id: string
+  user_id: string
+}
+
+export type QuizCreate = {
+  max_attempts?: number
+  passing_threshold?: number
+  questions?: Array<{
+    [key: string]: unknown
+  }>
+  course_id: string
+}
+
 export type QuizPublic = {
   max_attempts?: number
   passing_threshold?: number
-  questions?: Array<QuizQuestion>
+  questions?: Array<{
+    [key: string]: unknown
+  }>
   id: string
   course_id: string
 }
@@ -88,6 +108,17 @@ export type QuizQuestion = {
   question: string
   choices: Array<string>
   correct_index: number
+}
+
+export type QuizUpdate = {
+  max_attempts?: number | null
+  passing_threshold?: number | null
+  questions?: Array<QuizQuestion> | null
+}
+
+export type QuizzesPublic = {
+  data: Array<QuizPublic>
+  count: number
 }
 
 export type RoleCreate = {
@@ -256,6 +287,91 @@ export type PrivateCreateUserData = {
 }
 
 export type PrivateCreateUserResponse = UserPublic
+
+export type QuizzesCreateQuizData = {
+  requestBody: QuizCreate
+}
+
+export type QuizzesCreateQuizResponse = QuizPublic
+
+export type QuizzesReadQuizzesData = {
+  limit?: number
+  skip?: number
+}
+
+export type QuizzesReadQuizzesResponse = QuizzesPublic
+
+export type QuizzesReadQuizData = {
+  quizId: string
+}
+
+export type QuizzesReadQuizResponse = QuizPublic
+
+export type QuizzesUpdateQuizData = {
+  quizId: string
+  requestBody: QuizUpdate
+}
+
+export type QuizzesUpdateQuizResponse = QuizPublic
+
+export type QuizzesDeleteQuizData = {
+  quizId: string
+}
+
+export type QuizzesDeleteQuizResponse = Message
+
+export type QuizzesSubmitQuizAttemptData = {
+  quizId: string
+  requestBody: Array<number>
+}
+
+export type QuizzesSubmitQuizAttemptResponse = QuizAttemptPublic
+
+export type QuizzesGetQuizAttemptsData = {
+  limit?: number
+  quizId: string
+  skip?: number
+}
+
+export type QuizzesGetQuizAttemptsResponse = Array<QuizAttemptPublic>
+
+export type QuizzesGetQuizStatsData = {
+  quizId: string
+}
+
+export type QuizzesGetQuizStatsResponse = {
+  [key: string]: unknown
+}
+
+export type QuizzesGetQuizAnalyticsData = {
+  quizId: string
+}
+
+export type QuizzesGetQuizAnalyticsResponse = {
+  [key: string]: unknown
+}
+
+export type QuizzesGetQuizAnalytics1Data = {
+  quizId: string
+}
+
+export type QuizzesGetQuizAnalytics1Response = QuizPublic
+
+export type QuizzesGetQuestionsAnalysisData = {
+  quizId: string
+}
+
+export type QuizzesGetQuestionsAnalysisResponse = Array<{
+  [key: string]: unknown
+}>
+
+export type QuizzesGetCourseQuizProgressData = {
+  courseId: string
+}
+
+export type QuizzesGetCourseQuizProgressResponse = {
+  [key: string]: unknown
+}
 
 export type RolesGetRolesResponse = RolesPublic
 

@@ -213,6 +213,9 @@ def create_quiz(session: Session, quiz_create: QuizCreate) -> Quiz:
 
 def update_quiz(session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
     """Partially update an existing Quiz."""
+    if not db_quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
     quiz_data = quiz_in.model_dump(exclude_unset=True)
     db_quiz.sqlmodel_update(quiz_data)
     session.add(db_quiz)
@@ -220,11 +223,16 @@ def update_quiz(session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
     session.refresh(db_quiz)
     return db_quiz
 
+
 def delete_quiz(session: Session, db_quiz: Quiz) -> Quiz:
     """Delete a Quiz."""
+    if not db_quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
     session.delete(db_quiz)
     session.commit()
     return db_quiz
+
 
 # ===========================
 #  QUIZ ATTEMPT CRUD
