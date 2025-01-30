@@ -1,7 +1,7 @@
 import uuid
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from app import crud
 from app.core.config import settings
@@ -82,10 +82,10 @@ def update_user(*, session: SessionDep, user_id: uuid.UUID, user_in: UserUpdate)
     return db_user
 
 @router.delete("/{user_id}", dependencies=[SuperuserRequired])
-def delete_user(session: SessionDep, current_user: CurrentSuperUser, user_id: uuid.UUID) -> Message:
+def delete_user(session: SessionDep, admin_user: CurrentSuperUser, user_id: uuid.UUID) -> Message:
     if not (user := session.get(User, user_id)):
         raise HTTPException(status_code=404, detail="User not found")
-    if user == current_user:
+    if user == admin_user:
         raise HTTPException(status_code=403, detail="Superusers cannot delete themselves")
     session.delete(user)
     session.commit()

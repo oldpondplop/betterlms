@@ -1,8 +1,8 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import Sequence, func
 from sqlmodel import select
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 from app.api.deps import SessionDep, get_current_active_superuser
 from app.models import (
     Course, CoursesPublic, Message, Role, RoleCreate, RolePublic, RoleUpdate, 
@@ -18,12 +18,9 @@ def get_role_or_404(role_id: uuid.UUID, session: SessionDep) -> Role:
 
 RoleDep = Annotated[Role, Depends(get_role_or_404)]
 
-@router.get("/", response_model=RolesPublic)
-def get_roles(session: SessionDep) -> RolesPublic:
-    return RolesPublic(
-        data=session.exec(select(Role)).all(),
-        count=session.exec(select(func.count()).select_from(Role)).one()
-    )
+@router.get("/", response_model=List[RolePublic])
+def get_roles(session: SessionDep) -> Any:
+    return session.exec(select(Role)).all()
 
 @router.get("/{role_id}", response_model=RolePublic)
 def get_role(role: RoleDep) -> Any:
