@@ -3,6 +3,7 @@ from datetime import datetime, date, timezone
 from typing import List, Optional
 from enum import Enum
 from pydantic import EmailStr, BaseModel
+from sqlalchemy import ForeignKey
 from sqlmodel import Field, Relationship, SQLModel, Column
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.types import JSON
@@ -22,32 +23,39 @@ class CourseStatusEnum(str, Enum):
 
 class CourseRoleLink(SQLModel, table=True):
     course_id: uuid.UUID = Field(
-        foreign_key="course.id",
-        primary_key=True,
-        sa_column_kwargs={"ondelete": "CASCADE"}
+        sa_column=Column(
+            ForeignKey("course.id", ondelete="CASCADE"),
+            primary_key=True,
+            nullable=False
+        )
     )
     role_id: uuid.UUID = Field(
-        foreign_key="role.id",
-        primary_key=True,
-        sa_column_kwargs={"ondelete": "CASCADE"}
+        sa_column=Column(
+            ForeignKey("role.id", ondelete="CASCADE"),
+            primary_key=True,
+            nullable=False
+        )
     )
 
 
 class CourseUserLink(SQLModel, table=True):
     course_id: uuid.UUID = Field(
-        foreign_key="course.id",
-        primary_key=True,
-        sa_column_kwargs={"ondelete": "CASCADE"}
+        sa_column=Column(
+            ForeignKey("course.id", ondelete="CASCADE"),
+            primary_key=True,
+            nullable=False
+        )
     )
     user_id: uuid.UUID = Field(
-        foreign_key="user.id",
-        primary_key=True,
-        sa_column_kwargs={"ondelete": "CASCADE"}
+        sa_column=Column(
+            ForeignKey("user.id", ondelete="CASCADE"),
+            primary_key=True,
+            nullable=False
+        )
     )
     status: CourseStatusEnum = Field(default=CourseStatusEnum.ASSIGNED)
     attempt_count: int = 0
     score: Optional[int] = None
-
 
 # ================================
 # ROLE MODELS
@@ -126,9 +134,10 @@ class User(UserBase, table=True):
     hashed_password: str
 
     role_id: Optional[uuid.UUID] = Field(
-        foreign_key="role.id",
-        nullable=True,
-        sa_column_kwargs={"ondelete": "SET NULL"}
+        sa_column=Column(
+            ForeignKey("role.id", ondelete="SET NULL"),
+            nullable=True
+        )
     )
     role: Optional[Role] = Relationship(back_populates="users")
 
@@ -236,10 +245,11 @@ class Quiz(QuizBase, table=True):
     
     # Relationship back to the Course model
     course_id: Optional[uuid.UUID] = Field(
-        foreign_key="course.id",
-        unique=True,
-        nullable=True,
-        sa_column_kwargs={"ondelete": "CASCADE"}  # quiz deleted when course is deleted
+        sa_column=Column(
+            ForeignKey("course.id", ondelete="CASCADE"), 
+            unique=True, 
+            nullable=True
+        )
     )
     course: Optional[Course] = Relationship(back_populates="quiz")
     # Relationship to track user attempts
@@ -277,14 +287,18 @@ class QuizAttempt(QuizAttemptBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
     quiz_id: uuid.UUID = Field(
-        foreign_key="quiz.id",
-        sa_column_kwargs={"ondelete": "CASCADE"}  # if quiz is deleted, remove attempt
+        sa_column=Column(
+            ForeignKey("quiz.id", ondelete="CASCADE"),
+            nullable=False
+        )
     )
     quiz: Quiz = Relationship(back_populates="attempts")
 
     user_id: uuid.UUID = Field(
-        foreign_key="user.id",
-        sa_column_kwargs={"ondelete": "CASCADE"}  # if user is deleted, remove attempt
+        sa_column=Column(
+            ForeignKey("user.id", ondelete="CASCADE"),
+            nullable=False
+        )
     )
     user: User = Relationship(back_populates="quiz_attempts")
 
