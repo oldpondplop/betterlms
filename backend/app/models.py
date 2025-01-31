@@ -21,19 +21,32 @@ class CourseStatusEnum(str, Enum):
 # ================================
 
 class CourseRoleLink(SQLModel, table=True):
-    """Junction table linking Courses and Roles (many-to-many)."""
-    course_id: uuid.UUID = Field(foreign_key="course.id", primary_key=True)
-    role_id: uuid.UUID = Field(foreign_key="role.id", primary_key=True)
+    course_id: uuid.UUID = Field(
+        foreign_key="course.id",
+        primary_key=True,
+        sa_column_kwargs={"ondelete": "CASCADE"}
+    )
+    role_id: uuid.UUID = Field(
+        foreign_key="role.id",
+        primary_key=True,
+        sa_column_kwargs={"ondelete": "CASCADE"}
+    )
 
 
 class CourseUserLink(SQLModel, table=True):
-    """Junction table linking Courses and Users (many-to-many)."""
-    course_id: uuid.UUID = Field(foreign_key="course.id", primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="user.id", primary_key=True)
-
+    course_id: uuid.UUID = Field(
+        foreign_key="course.id",
+        primary_key=True,
+        sa_column_kwargs={"ondelete": "CASCADE"}
+    )
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id",
+        primary_key=True,
+        sa_column_kwargs={"ondelete": "CASCADE"}
+    )
     status: CourseStatusEnum = Field(default=CourseStatusEnum.ASSIGNED)
-    quiz_score: Optional[int] = None
-    attempt_count: int = Field(default=0)
+    attempt_count: int = 0
+    score: Optional[int] = None
 
 
 # ================================
@@ -42,7 +55,6 @@ class CourseUserLink(SQLModel, table=True):
 
 class RoleBase(SQLModel):
     name: str = Field(unique=True, index=True, max_length=255)
-    description: Optional[str] = None
 
 class RoleCreate(RoleBase):
     pass
@@ -56,7 +68,6 @@ class RolesPublic(SQLModel):
 
 class RoleUpdate(SQLModel):
     name: Optional[str] = None
-    description: Optional[str] = None
 
 class Role(RoleBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -113,9 +124,12 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
-    
-    # Single role per user
-    role_id: Optional[uuid.UUID] = Field(foreign_key="role.id", nullable=True)
+
+    role_id: Optional[uuid.UUID] = Field(
+        foreign_key="role.id",
+        nullable=True,
+        sa_column_kwargs={"ondelete": "SET NULL"}
+    )
     role: Optional[Role] = Relationship(back_populates="users")
 
     # Many-to-many with Courses (through CourseUserLink)
@@ -167,32 +181,6 @@ class CourseUpdate(SQLModel):
 
 class CourseAttachQuiz(SQLModel):
     quiz_id: uuid.UUID
-
-class CoursePublicFull(CoursePublic):
-    roles: List[RolePublic] = []
-    users: List[UserPublic] = []
-    quiz: Optional['QuizPublic'] = None
-
-class CourseCreateFull(CourseCreate):
-    roles: List[uuid.UUID] = []
-    users: List[uuid.UUID] = []
-    quiz: Optional['QuizCreate'] = None
-
-class CourseUpdateFull(CourseUpdate):
-    roles: Optional[List[uuid.UUID]] = None
-    users: Optional[List[uuid.UUID]] = None
-    quiz: Optional['QuizUpdate'] = None
-
-class CourseUserProgress(BaseModel):
-    user: UserPublic
-    status: CourseStatusEnum
-    attempt_count: int
-    quiz_score: Optional[int] = None
-
-class CourseDetailed(CoursePublic):
-    roles: List[RolePublic] = []
-    users: List[UserPublic] = []
-    quiz: Optional['QuizPublic'] = None
 
 class Course(CourseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -247,8 +235,13 @@ class Quiz(QuizBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     
     # Relationship back to the Course model
-    course_id: uuid.UUID = Field(foreign_key="course.id", unique=True)
-    course: Course = Relationship(back_populates="quiz")
+    course_id: Optional[uuid.UUID] = Field(
+        foreign_key="course.id",
+        unique=True,
+        nullable=True,
+        sa_column_kwargs={"ondelete": "CASCADE"}  # quiz deleted when course is deleted
+    )
+    course: Optional[Course] = Relationship(back_populates="quiz")
     # Relationship to track user attempts
     attempts: List["QuizAttempt"] = Relationship(back_populates="quiz")
 
@@ -283,10 +276,16 @@ class QuizAttemptUpdate(SQLModel):
 class QuizAttempt(QuizAttemptBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
-    quiz_id: uuid.UUID = Field(foreign_key="quiz.id")
+    quiz_id: uuid.UUID = Field(
+        foreign_key="quiz.id",
+        sa_column_kwargs={"ondelete": "CASCADE"}  # if quiz is deleted, remove attempt
+    )
     quiz: Quiz = Relationship(back_populates="attempts")
 
-    user_id: uuid.UUID = Field(foreign_key="user.id")
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id",
+        sa_column_kwargs={"ondelete": "CASCADE"}  # if user is deleted, remove attempt
+    )
     user: User = Relationship(back_populates="quiz_attempts")
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
