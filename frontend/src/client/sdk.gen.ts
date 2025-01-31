@@ -14,12 +14,14 @@ import type {
   CoursesUpdateCourseResponse,
   CoursesDeleteCourseData,
   CoursesDeleteCourseResponse,
-  CoursesAttachQuizToCourseData,
-  CoursesAttachQuizToCourseResponse,
   CoursesAssignRoleToCourseData,
   CoursesAssignRoleToCourseResponse,
   CoursesUnassignRoleFromCourseData,
   CoursesUnassignRoleFromCourseResponse,
+  CoursesAssignUserToCourseData,
+  CoursesAssignUserToCourseResponse,
+  CoursesUnassignUserFromCourseData,
+  CoursesUnassignUserFromCourseResponse,
   LoginLoginAccessTokenData,
   LoginLoginAccessTokenResponse,
   LoginTestTokenResponse,
@@ -111,11 +113,11 @@ export class CoursesService {
 
   /**
    * Read Courses
-   * Retrieve a list of courses. Accessible by any authenticated user.
+   * Retrieve all courses with pagination.
    * @param data The data for the request.
    * @param data.skip
    * @param data.limit
-   * @returns CoursePublic Successful Response
+   * @returns CoursesPublic Successful Response
    * @throws ApiError
    */
   public static readCourses(
@@ -185,7 +187,7 @@ export class CoursesService {
 
   /**
    * Delete Course
-   * Delete a course by its ID. Only accessible by superusers.
+   * Delete a course and all its related data.
    * @param data The data for the request.
    * @param data.courseId
    * @returns Message Successful Response
@@ -199,33 +201,6 @@ export class CoursesService {
       url: "/api/v1/courses/{course_id}",
       path: {
         course_id: data.courseId,
-      },
-      errors: {
-        422: "Validation Error",
-      },
-    })
-  }
-
-  /**
-   * Attach Quiz To Course
-   * Attach a quiz to a course. Only accessible by superusers.
-   * @param data The data for the request.
-   * @param data.courseId
-   * @param data.quizId
-   * @returns CoursePublic Successful Response
-   * @throws ApiError
-   */
-  public static attachQuizToCourse(
-    data: CoursesAttachQuizToCourseData,
-  ): CancelablePromise<CoursesAttachQuizToCourseResponse> {
-    return __request(OpenAPI, {
-      method: "POST",
-      url: "/api/v1/courses/{course_id}/attach-quiz",
-      path: {
-        course_id: data.courseId,
-      },
-      query: {
-        quiz_id: data.quizId,
       },
       errors: {
         422: "Validation Error",
@@ -275,6 +250,55 @@ export class CoursesService {
       path: {
         course_id: data.courseId,
         role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Assign User To Course
+   * Assign a user to a course. Only accessible by superusers.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.userId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static assignUserToCourse(
+    data: CoursesAssignUserToCourseData,
+  ): CancelablePromise<CoursesAssignUserToCourseResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/assign-user/{user_id}",
+      path: {
+        course_id: data.courseId,
+        user_id: data.userId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Unassign User From Course
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.userId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static unassignUserFromCourse(
+    data: CoursesUnassignUserFromCourseData,
+  ): CancelablePromise<CoursesUnassignUserFromCourseResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/remove-user/{user_id}",
+      path: {
+        course_id: data.courseId,
+        user_id: data.userId,
       },
       errors: {
         422: "Validation Error",
@@ -485,7 +509,6 @@ export class QuizzesService {
 
   /**
    * Update Quiz
-   * Update quiz details. Only accessible by superusers.
    * @param data The data for the request.
    * @param data.quizId
    * @param data.requestBody

@@ -18,7 +18,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect } from "react"
 import { z } from "zod"
 
-import { CoursesService, type CoursePublic, type UserPublic } from "../../client"
+import { CoursesService, type CourseDetailed, type UserPublic } from "../../client"
 import AddCourse from "../../components/Course/AddCourse"
 import ActionsMenu from "../../components/Common/ActionsMenu"
 import Navbar from "../../components/Common/Navbar"
@@ -35,7 +35,6 @@ export const Route = createFileRoute("/_layout/course")({
 
 const PER_PAGE = 5
 
-// Add a styled badge component for roles count
 const RolesBadge = ({ count }: { count: number }) => (
   <Badge
     bg="rgba(0, 150, 255, 0.1)"
@@ -50,6 +49,20 @@ const RolesBadge = ({ count }: { count: number }) => (
   </Badge>
 )
 
+const UsersBadge = ({ count }: { count: number }) => (
+  <Badge
+    bg="rgba(255, 150, 0, 0.1)"
+    color="orange.500"
+    borderRadius="md"
+    px={3}
+    py={1}
+    fontSize="sm"
+    fontWeight="medium"
+  >
+    {count} USERS
+  </Badge>
+)
+
 function CoursesTable() {
   const queryClient = useQueryClient()
   const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
@@ -58,30 +71,21 @@ function CoursesTable() {
   const setPage = (page: number) =>
     navigate({ search: (prev: {[key: string]: string}) => ({ ...prev, page }) })
 
-  // Query detailed course information
   const {
-    data: courses,
+    data: coursesResponse,
     isPending,
     isPlaceholderData,
-  } = useQuery({
-    queryFn: async () => {
-      const coursesList = await CoursesService.readCourses({ 
-        skip: (page - 1) * PER_PAGE, 
-        limit: PER_PAGE 
-      })
-      // Fetch detailed information for each course
-      const detailedCourses = await Promise.all(
-        coursesList.map(course => 
-          CoursesService.readCourse({ courseId: course.id })
-        )
-      )
-      return detailedCourses
-    },
+  } = useQuery<{ data: CourseDetailed[], count: number }>({
+    queryFn: () => CoursesService.readCourses({ 
+      skip: (page - 1) * PER_PAGE, 
+      limit: PER_PAGE 
+    }),
     queryKey: ["courses", { page }],
     placeholderData: (prevData) => prevData,
   })
 
-  const hasNextPage = !isPlaceholderData && courses?.length === PER_PAGE
+  const courses = coursesResponse?.data || []
+  const hasNextPage = !isPlaceholderData && courses.length === PER_PAGE
   const hasPreviousPage = page > 1
 
   useEffect(() => {
@@ -99,18 +103,19 @@ function CoursesTable() {
         <Table size={{ base: "sm", md: "md" }}>
           <Thead>
             <Tr>
-              <Th width="25%">Title</Th>
-              <Th width="35%">Description</Th>
+              <Th width="20%">Title</Th>
+              <Th width="30%">Description</Th>
               <Th width="10%">Status</Th>
               <Th width="10%">Quiz</Th>
               <Th width="10%">Roles</Th>
+              <Th width="10%">Users</Th>
               <Th width="10%">Actions</Th>
             </Tr>
           </Thead>
           {isPending ? (
             <Tbody>
               <Tr>
-                {new Array(6).fill(null).map((_, index) => (
+                {new Array(7).fill(null).map((_, index) => (
                   <Td key={index}>
                     <SkeletonText noOfLines={1} paddingBlock="16px" />
                   </Td>
@@ -150,6 +155,9 @@ function CoursesTable() {
                     <RolesBadge count={course.roles?.length || 0} />
                   </Td>
                   <Td>
+                    <UsersBadge count={course.users?.length || 0} />
+                  </Td>
+                  <Td>
                     <ActionsMenu
                       type="Course"
                       value={course}
@@ -178,9 +186,10 @@ function Course() {
       <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
         Courses Management
       </Heading>
-
       <Navbar type="Course" addModalAs={AddCourse} />
       <CoursesTable />
     </Container>
   )
 }
+
+export default Course

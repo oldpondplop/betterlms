@@ -30,17 +30,17 @@ import {
   GridItem,
 } from "@chakra-ui/react";
 import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons';
-import { FaBook, FaCalendar, FaInfoCircle, FaUserTag } from "react-icons/fa";
+import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser } from "react-icons/fa";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type SubmitHandler, useForm, Controller } from "react-hook-form";
 import { useState } from "react";
 import { 
   type CourseCreate, 
   CoursesService,
-  RolesService
+  RolesService,
+  UsersService,
 } from "../../client";
 import useCustomToast from "../../hooks/useCustomToast";
-import { handleError } from "../../utils";
 
 interface AddCourseProps {
   isOpen: boolean;
@@ -49,17 +49,24 @@ interface AddCourseProps {
 
 interface FormInputs extends CourseCreate {
   role_ids: string[];
+  user_ids: string[]; // New field for user assignments
 }
 
 const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
   const queryClient = useQueryClient();
   const showToast = useCustomToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState(""); // New state for user search
   const [submitting, setSubmitting] = useState(false);
 
   const { data: roles } = useQuery({
     queryKey: ["roles"],
     queryFn: () => RolesService.getRoles(),
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => UsersService.getUsers(),
   });
 
   const {
@@ -78,6 +85,7 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
       start_date: null,
       end_date: null,
       role_ids: [],
+      user_ids: [], // Initialize user_ids
     },
   });
 
@@ -107,7 +115,17 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
         }
       }
 
-      showToast("Success!", "Course created and roles assigned successfully.", "success");
+      // If users are selected, assign them
+      if (data.user_ids?.length > 0) {
+        for (const userId of data.user_ids) {
+          await CoursesService.assignUserToCourse({
+            courseId: course.id,
+            userId: userId,
+          });
+        }
+      }
+
+      showToast("Success!", "Course created and assigned successfully.", "success");
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       reset();
       onClose();
@@ -125,6 +143,10 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
 
   const filteredRoles = roles?.data?.filter(role => 
     role.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  const filteredUsers = users?.data?.filter(user => 
+    user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
   ) || [];
 
   return (
@@ -266,6 +288,81 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
                             <TagCloseButton
                               onClick={() => {
                                 onChange(value.filter(id => id !== roleId));
+                              }}
+                            />
+                          </Tag>
+                        ) : null;
+                      })}
+                    </Flex>
+                  </>
+                )}
+              />
+            </FormControl>
+
+            {/* New Section: Assign to Users */}
+            <FormControl>
+              <FormLabel>
+                <Icon as={FaUser} mr={2} />
+                Assign to Users
+              </FormLabel>
+              <Controller
+                name="user_ids"
+                control={control}
+                defaultValue={[]}
+                render={({ field: { value, onChange } }) => (
+                  <>
+                    <Menu closeOnSelect={false}>
+                      <MenuButton 
+                        as={Button} 
+                        rightIcon={<ChevronDownIcon />}
+                        w="100%"
+                        textAlign="left"
+                        variant="outline"
+                      >
+                        {value.length ? `${value.length} user(s) selected` : 'Select users'}
+                      </MenuButton>
+                      <MenuList maxH="200px" overflowY="auto">
+                        <Box px={4} pb={2}>
+                          <InputGroup size="sm">
+                            <InputLeftElement>
+                              <SearchIcon color="gray.400" />
+                            </InputLeftElement>
+                            <Input
+                              placeholder="Search users..."
+                              value={userSearchQuery}
+                              onChange={(e) => setUserSearchQuery(e.target.value)}
+                            />
+                          </InputGroup>
+                        </Box>
+                        {filteredUsers.map((user) => (
+                          <MenuItem
+                            key={user.id}
+                            onClick={() => {
+                              if (!value.includes(user.id)) {
+                                onChange([...value, user.id]);
+                              }
+                            }}
+                          >
+                            {user.name}
+                          </MenuItem>
+                        ))}
+                      </MenuList>
+                    </Menu>
+                    <Flex mt={2} gap={2} flexWrap="wrap">
+                      {value.map((userId) => {
+                        const user = users?.data.find(u => u.id === userId);
+                        return user ? (
+                          <Tag
+                            key={userId}
+                            size="md"
+                            borderRadius="full"
+                            variant="solid"
+                            colorScheme="blue"
+                          >
+                            <TagLabel>{user.name}</TagLabel>
+                            <TagCloseButton
+                              onClick={() => {
+                                onChange(value.filter(id => id !== userId));
                               }}
                             />
                           </Tag>

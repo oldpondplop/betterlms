@@ -114,6 +114,7 @@ export type QuizUpdate = {
   max_attempts?: number | null
   passing_threshold?: number | null
   questions?: Array<QuizQuestion> | null
+  course_id?: string | null
 }
 
 export type QuizzesPublic = {
@@ -214,7 +215,7 @@ export type CoursesReadCoursesData = {
   skip?: number
 }
 
-export type CoursesReadCoursesResponse = Array<CoursePublic>
+export type CoursesReadCoursesResponse = CoursesPublic
 
 export type CoursesReadCourseData = {
   courseId: string
@@ -235,13 +236,6 @@ export type CoursesDeleteCourseData = {
 
 export type CoursesDeleteCourseResponse = Message
 
-export type CoursesAttachQuizToCourseData = {
-  courseId: string
-  quizId: string
-}
-
-export type CoursesAttachQuizToCourseResponse = CoursePublic
-
 export type CoursesAssignRoleToCourseData = {
   courseId: string
   roleId: string
@@ -255,6 +249,20 @@ export type CoursesUnassignRoleFromCourseData = {
 }
 
 export type CoursesUnassignRoleFromCourseResponse = Message
+
+export type CoursesAssignUserToCourseData = {
+  courseId: string
+  userId: string
+}
+
+export type CoursesAssignUserToCourseResponse = Message
+
+export type CoursesUnassignUserFromCourseData = {
+  courseId: string
+  userId: string
+}
+
+export type CoursesUnassignUserFromCourseResponse = Message
 
 export type LoginLoginAccessTokenData = {
   formData: Body_login_login_access_token

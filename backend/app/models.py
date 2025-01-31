@@ -3,6 +3,7 @@ from datetime import datetime, date, timezone
 from typing import List, Optional
 from enum import Enum
 from pydantic import EmailStr
+from sqlalchemy import ForeignKey
 from sqlmodel import Field, Relationship, SQLModel, Column, JSON, func
 
 
@@ -171,7 +172,6 @@ class CourseDetailed(CoursePublic):
     quiz: Optional['QuizPublic'] = None
 
 class Course(CourseBase, table=True):
-    """The actual Course table model."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
     # Many-to-many with Roles
@@ -179,7 +179,10 @@ class Course(CourseBase, table=True):
     # Many-to-many with Users
     users: List[User] = Relationship(back_populates="courses", link_model=CourseUserLink)
     # One-to-many with Quiz (assuming multiple quizzes per course)
-    quiz: Optional["Quiz"] = Relationship(back_populates="course")
+    quiz: Optional["Quiz"] = Relationship(
+        back_populates="course",
+        sa_relationship_kwargs={"passive_deletes": True}
+    )
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime | None = Field(
@@ -189,7 +192,6 @@ class Course(CourseBase, table=True):
             "onupdate": lambda: datetime.now(timezone.utc),
         },
     )
-
 
 # ================================
 # QUIZ MODELS
@@ -220,16 +222,22 @@ class QuizUpdate(SQLModel):
     max_attempts: Optional[int] = None
     passing_threshold: Optional[int] = None
     questions: Optional[List[QuizQuestion]] = None
-
+    course_id: Optional[uuid.UUID] = None
+    
 class Quiz(QuizBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     
     # Relationship back to the Course model
-    course_id: uuid.UUID = Field(foreign_key="course.id", unique=True)
+    course_id: uuid.UUID = Field(
+        sa_column=Column(
+            ForeignKey("course.id", ondelete="CASCADE"),
+            unique=True,
+            nullable=False,
+        )
+    )
     course: Course = Relationship(back_populates="quiz")
     # Relationship to track user attempts
     attempts: List["QuizAttempt"] = Relationship(back_populates="quiz")
-
 
 # ================================
 # QUIZ ATTEMPT MODELS

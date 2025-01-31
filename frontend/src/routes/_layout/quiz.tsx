@@ -18,7 +18,7 @@ import {
   import { useEffect } from "react"
   import { z } from "zod"
   
-  import { QuizzesService, CoursesService, type QuizPublic, type UserPublic, CoursePublic } from "../../client"
+  import { QuizzesService, CoursesService, type QuizPublic, type UserPublic, CoursePublic, CoursesPublic } from "../../client"
   import AddQuiz from "../../components/Quiz/AddQuiz"
   import Navbar from "../../components/Common/Navbar"
   import { PaginationFooter } from "../../components/Common/PaginationFooter"
@@ -71,7 +71,7 @@ import {
     const setPage = (page: number) =>
       navigate({ search: (prev: {[key: string]: string}) => ({ ...prev, page }) })
   
-    const { data: courses } = useQuery<CoursePublic[]>({
+    const { data: courses } = useQuery<CoursesPublic>({
         queryFn: async () => {
           const response = await CoursesService.readCourses()
           return response
@@ -142,7 +142,7 @@ import {
                 {quizzes?.map((quiz: QuizPublic) => (
                   <Tr key={quiz.id}>
                     <Td isTruncated maxWidth="200px">
-                        {courses?.find(course => course.id === quiz.course_id)?.title ?? quiz.course_id}
+                        {courses?.data.find(course => course.id === quiz.course_id)?.title ?? quiz.course_id}
                     </Td>
                     <Td>
                       <QuestionsBadge count={quiz.questions?.length ?? 0} />

@@ -28,7 +28,7 @@ import {
   import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
   import { SubmitHandler, useForm, useFieldArray } from "react-hook-form";
   import { useState, useEffect } from "react";
-  import { QuizCreate, QuizzesService, CoursesService, CoursePublic } from "../../client";
+  import { QuizCreate, QuizzesService, CoursesService, CoursePublic, CoursesPublic } from "../../client";
   import useCustomToast from "../../hooks/useCustomToast";
   import { handleError } from "../../utils";
   
@@ -45,11 +45,12 @@ import {
     const [selectedCourseId, setSelectedCourseId] = useState(courseId || "");
   
     // Fetch courses for the dropdown
-    const { data: coursesResponse, isLoading: isCoursesLoading } = useQuery({
+    const { data: coursesResponse, isLoading: isCoursesLoading } = useQuery<CoursesPublic>({
       queryKey: ["courses"],
       queryFn: () => CoursesService.readCourses({ skip: 0, limit: 100 }),
     });
-    const courses: CoursePublic[] = coursesResponse || [];
+    
+    const courses = coursesResponse?.data || [];
   
     const {
       register,

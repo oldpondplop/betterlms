@@ -62,12 +62,33 @@ def update_quiz(
     quiz_update: QuizUpdate,
     admin_user: CurrentSuperUser,
 ) -> Any:
-    """Update quiz details. Only accessible by superusers."""
     quiz = crud.get_quiz_by_id(session=session, quiz_id=quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
-    return crud.update_quiz(session=session, db_quiz=quiz, quiz_in=quiz_update)
+    if quiz_update.course_id is not None:
+        quiz.course_id = quiz_update.course_id
+    
+    if quiz_update.questions is not None:
+        # Convert QuizQuestion objects to dictionaries
+        quiz.questions = [
+            {
+                "question": q.question,
+                "choices": q.choices,
+                "correct_index": q.correct_index
+            } 
+            for q in quiz_update.questions
+        ]
+    
+    if quiz_update.max_attempts is not None:
+        quiz.max_attempts = quiz_update.max_attempts
+        
+    if quiz_update.passing_threshold is not None:
+        quiz.passing_threshold = quiz_update.passing_threshold
+    
+    session.commit()
+    session.refresh(quiz)
+    return quiz
 
 @router.delete("/{quiz_id}", response_model=Message)
 def delete_quiz(
