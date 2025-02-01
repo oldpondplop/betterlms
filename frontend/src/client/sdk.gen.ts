@@ -4,6 +4,51 @@ import type { CancelablePromise } from "./core/CancelablePromise"
 import { OpenAPI } from "./core/OpenAPI"
 import { request as __request } from "./core/request"
 import type {
+  CoursesGetMyCoursesResponse,
+  CoursesGetCoursesData,
+  CoursesGetCoursesResponse,
+  CoursesCreateCourseData,
+  CoursesCreateCourseResponse,
+  CoursesGetCourseData,
+  CoursesGetCourseResponse,
+  CoursesUpdateCourseData,
+  CoursesUpdateCourseResponse,
+  CoursesDeleteCourseData,
+  CoursesDeleteCourseResponse,
+  CoursesGetCourseRolesData,
+  CoursesGetCourseRolesResponse,
+  CoursesAssignRoleData,
+  CoursesAssignRoleResponse,
+  CoursesUnassignRoleData,
+  CoursesUnassignRoleResponse,
+  CoursesGetCourseUsersData,
+  CoursesGetCourseUsersResponse,
+  CoursesAssignUserData,
+  CoursesAssignUserResponse,
+  CoursesUnassignUserData,
+  CoursesUnassignUserResponse,
+  CoursesAttachQuizData,
+  CoursesAttachQuizResponse,
+  CoursesGetCourseQuizData,
+  CoursesGetCourseQuizResponse,
+  CoursesUpdateCourseQuizData,
+  CoursesUpdateCourseQuizResponse,
+  CoursesRemoveCourseQuizData,
+  CoursesRemoveCourseQuizResponse,
+  CoursesGetCourseProgressData,
+  CoursesGetCourseProgressResponse,
+  CoursesGetCourseAnalyticsData,
+  CoursesGetCourseAnalyticsResponse,
+  CoursesUploadMaterialData,
+  CoursesUploadMaterialResponse,
+  CoursesUpdateMaterialsData,
+  CoursesUpdateMaterialsResponse,
+  CoursesListMaterialsData,
+  CoursesListMaterialsResponse,
+  CoursesDownloadMaterialData,
+  CoursesDownloadMaterialResponse,
+  CoursesDeleteMaterialData,
+  CoursesDeleteMaterialResponse,
   LoginLoginAccessTokenData,
   LoginLoginAccessTokenResponse,
   LoginTestTokenResponse,
@@ -15,18 +60,29 @@ import type {
   LoginRecoverPasswordHtmlContentResponse,
   PrivateCreateUserData,
   PrivateCreateUserResponse,
-  UsersReadUsersData,
-  UsersReadUsersResponse,
-  UsersCreateUserData,
-  UsersCreateUserResponse,
+  RolesGetRolesResponse,
+  RolesCreateRoleData,
+  RolesCreateRoleResponse,
+  RolesGetRoleData,
+  RolesGetRoleResponse,
+  RolesUpdateRoleData,
+  RolesUpdateRoleResponse,
+  RolesDeleteRoleData,
+  RolesDeleteRoleResponse,
+  RolesGetUsersByRoleData,
+  RolesGetUsersByRoleResponse,
+  RolesGetCoursesByRoleData,
+  RolesGetCoursesByRoleResponse,
   UsersReadUserMeResponse,
   UsersDeleteUserMeResponse,
   UsersUpdateUserMeData,
   UsersUpdateUserMeResponse,
   UsersUpdatePasswordMeData,
   UsersUpdatePasswordMeResponse,
-  UsersRegisterUserData,
-  UsersRegisterUserResponse,
+  UsersGetUsersData,
+  UsersGetUsersResponse,
+  UsersCreateUserData,
+  UsersCreateUserResponse,
   UsersReadUserByIdData,
   UsersReadUserByIdResponse,
   UsersUpdateUserData,
@@ -37,6 +93,549 @@ import type {
   UtilsTestEmailResponse,
   UtilsHealthCheckResponse,
 } from "./types.gen"
+
+export class CoursesService {
+  /**
+   * Get My Courses
+   * @returns CoursesPublic Successful Response
+   * @throws ApiError
+   */
+  public static getMyCourses(): CancelablePromise<CoursesGetMyCoursesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/me",
+    })
+  }
+
+  /**
+   * Get Courses
+   * Retrieve all courses with pagination.
+   * @param data The data for the request.
+   * @param data.skip
+   * @param data.limit
+   * @returns CoursesPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourses(
+    data: CoursesGetCoursesData = {},
+  ): CancelablePromise<CoursesGetCoursesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/",
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Create Course
+   * Create a new course.
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static createCourse(
+    data: CoursesCreateCourseData,
+  ): CancelablePromise<CoursesCreateCourseResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course
+   * Retrieve a specific course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourse(
+    data: CoursesGetCourseData,
+  ): CancelablePromise<CoursesGetCourseResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Course
+   * Update course details.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.requestBody
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static updateCourse(
+    data: CoursesUpdateCourseData,
+  ): CancelablePromise<CoursesUpdateCourseResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/courses/{course_id}",
+      path: {
+        course_id: data.courseId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Delete Course
+   * Delete a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteCourse(
+    data: CoursesDeleteCourseData,
+  ): CancelablePromise<CoursesDeleteCourseResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course Roles
+   * Retrieve roles assigned to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns RolesPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourseRoles(
+    data: CoursesGetCourseRolesData,
+  ): CancelablePromise<CoursesGetCourseRolesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/roles",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Assign Role
+   * Assign a role to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.roleId
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static assignRole(
+    data: CoursesAssignRoleData,
+  ): CancelablePromise<CoursesAssignRoleResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/roles/{role_id}",
+      path: {
+        course_id: data.courseId,
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Unassign Role
+   * Remove a role from a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.roleId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static unassignRole(
+    data: CoursesUnassignRoleData,
+  ): CancelablePromise<CoursesUnassignRoleResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/roles/{role_id}",
+      path: {
+        course_id: data.courseId,
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course Users
+   * Retrieve users assigned to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns UsersPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourseUsers(
+    data: CoursesGetCourseUsersData,
+  ): CancelablePromise<CoursesGetCourseUsersResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/users",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Assign User
+   * Assign a user to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.userId
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static assignUser(
+    data: CoursesAssignUserData,
+  ): CancelablePromise<CoursesAssignUserResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/users/{user_id}",
+      path: {
+        course_id: data.courseId,
+        user_id: data.userId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Unassign User
+   * Remove a user from a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.userId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static unassignUser(
+    data: CoursesUnassignUserData,
+  ): CancelablePromise<CoursesUnassignUserResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/users/{user_id}",
+      path: {
+        course_id: data.courseId,
+        user_id: data.userId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Attach Quiz
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.requestBody
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static attachQuiz(
+    data: CoursesAttachQuizData,
+  ): CancelablePromise<CoursesAttachQuizResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/quiz",
+      path: {
+        course_id: data.courseId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course Quiz
+   * Retrieve a quiz attached to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourseQuiz(
+    data: CoursesGetCourseQuizData,
+  ): CancelablePromise<CoursesGetCourseQuizResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/quiz",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Course Quiz
+   * Update a quiz attached to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.requestBody
+   * @returns QuizPublic Successful Response
+   * @throws ApiError
+   */
+  public static updateCourseQuiz(
+    data: CoursesUpdateCourseQuizData,
+  ): CancelablePromise<CoursesUpdateCourseQuizResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/courses/{course_id}/quiz",
+      path: {
+        course_id: data.courseId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Remove Course Quiz
+   * Remove a quiz from a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static removeCourseQuiz(
+    data: CoursesRemoveCourseQuizData,
+  ): CancelablePromise<CoursesRemoveCourseQuizResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/quiz",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course Progress
+   * Retrieve the progress of all users for a specific course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns CoursesProgressPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourseProgress(
+    data: CoursesGetCourseProgressData,
+  ): CancelablePromise<CoursesGetCourseProgressResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/progress",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Course Analytics
+   * Retrieve analytics for a specific course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns CourseAnalyticsPublic Successful Response
+   * @throws ApiError
+   */
+  public static getCourseAnalytics(
+    data: CoursesGetCourseAnalyticsData,
+  ): CancelablePromise<CoursesGetCourseAnalyticsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/analytics",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Upload Material
+   * Upload a file and attach it to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.formData
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static uploadMaterial(
+    data: CoursesUploadMaterialData,
+  ): CancelablePromise<CoursesUploadMaterialResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/materials/",
+      path: {
+        course_id: data.courseId,
+      },
+      formData: data.formData,
+      mediaType: "multipart/form-data",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Materials
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.formData
+   * @returns CourseMaterialPublic Successful Response
+   * @throws ApiError
+   */
+  public static updateMaterials(
+    data: CoursesUpdateMaterialsData,
+  ): CancelablePromise<CoursesUpdateMaterialsResponse> {
+    return __request(OpenAPI, {
+      method: "PUT",
+      url: "/api/v1/courses/{course_id}/materials/",
+      path: {
+        course_id: data.courseId,
+      },
+      formData: data.formData,
+      mediaType: "multipart/form-data",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * List Materials
+   * List all materials for a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns string Successful Response
+   * @throws ApiError
+   */
+  public static listMaterials(
+    data: CoursesListMaterialsData,
+  ): CancelablePromise<CoursesListMaterialsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/materials/",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Download Material
+   * Download or view a material.
+   * @param data The data for the request.
+   * @param data.filename
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static downloadMaterial(
+    data: CoursesDownloadMaterialData,
+  ): CancelablePromise<CoursesDownloadMaterialResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/materials/{filename}",
+      path: {
+        filename: data.filename,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Delete Material
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.filename
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteMaterial(
+    data: CoursesDeleteMaterialData,
+  ): CancelablePromise<CoursesDeleteMaterialResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/materials/{filename}",
+      path: {
+        course_id: data.courseId,
+        filename: data.filename,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+}
 
 export class LoginService {
   /**
@@ -167,22 +766,127 @@ export class PrivateService {
   }
 }
 
-export class UsersService {
+export class RolesService {
   /**
-   * Read Users
-   * Retrieve users.
+   * Get Roles
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static getRoles(): CancelablePromise<RolesGetRolesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/roles/",
+    })
+  }
+
+  /**
+   * Create Role
    * @param data The data for the request.
+   * @param data.requestBody
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static createRole(
+    data: RolesCreateRoleData,
+  ): CancelablePromise<RolesCreateRoleResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/roles/",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static getRole(
+    data: RolesGetRoleData,
+  ): CancelablePromise<RolesGetRoleResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/roles/{role_id}",
+      path: {
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @param data.requestBody
+   * @returns RolePublic Successful Response
+   * @throws ApiError
+   */
+  public static updateRole(
+    data: RolesUpdateRoleData,
+  ): CancelablePromise<RolesUpdateRoleResponse> {
+    return __request(OpenAPI, {
+      method: "PATCH",
+      url: "/api/v1/roles/{role_id}",
+      path: {
+        role_id: data.roleId,
+      },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Delete Role
+   * @param data The data for the request.
+   * @param data.roleId
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteRole(
+    data: RolesDeleteRoleData,
+  ): CancelablePromise<RolesDeleteRoleResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/roles/{role_id}",
+      path: {
+        role_id: data.roleId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Users By Role
+   * @param data The data for the request.
+   * @param data.roleId
    * @param data.skip
    * @param data.limit
    * @returns UsersPublic Successful Response
    * @throws ApiError
    */
-  public static readUsers(
-    data: UsersReadUsersData = {},
-  ): CancelablePromise<UsersReadUsersResponse> {
+  public static getUsersByRole(
+    data: RolesGetUsersByRoleData,
+  ): CancelablePromise<RolesGetUsersByRoleResponse> {
     return __request(OpenAPI, {
       method: "GET",
-      url: "/api/v1/users/",
+      url: "/api/v1/roles/{role_id}/users",
+      path: {
+        role_id: data.roleId,
+      },
       query: {
         skip: data.skip,
         limit: data.limit,
@@ -194,30 +898,37 @@ export class UsersService {
   }
 
   /**
-   * Create User
-   * Create new user.
+   * Get Courses By Role
    * @param data The data for the request.
-   * @param data.requestBody
-   * @returns UserPublic Successful Response
+   * @param data.roleId
+   * @param data.skip
+   * @param data.limit
+   * @returns CoursesPublic Successful Response
    * @throws ApiError
    */
-  public static createUser(
-    data: UsersCreateUserData,
-  ): CancelablePromise<UsersCreateUserResponse> {
+  public static getCoursesByRole(
+    data: RolesGetCoursesByRoleData,
+  ): CancelablePromise<RolesGetCoursesByRoleResponse> {
     return __request(OpenAPI, {
-      method: "POST",
-      url: "/api/v1/users/",
-      body: data.requestBody,
-      mediaType: "application/json",
+      method: "GET",
+      url: "/api/v1/roles/{role_id}/courses",
+      path: {
+        role_id: data.roleId,
+      },
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
       errors: {
         422: "Validation Error",
       },
     })
   }
+}
 
+export class UsersService {
   /**
    * Read User Me
-   * Get current user.
    * @returns UserPublic Successful Response
    * @throws ApiError
    */
@@ -230,7 +941,6 @@ export class UsersService {
 
   /**
    * Delete User Me
-   * Delete own user.
    * @returns Message Successful Response
    * @throws ApiError
    */
@@ -243,7 +953,6 @@ export class UsersService {
 
   /**
    * Update User Me
-   * Update own user.
    * @param data The data for the request.
    * @param data.requestBody
    * @returns UserPublic Successful Response
@@ -265,7 +974,6 @@ export class UsersService {
 
   /**
    * Update Password Me
-   * Update own password.
    * @param data The data for the request.
    * @param data.requestBody
    * @returns Message Successful Response
@@ -286,19 +994,42 @@ export class UsersService {
   }
 
   /**
-   * Register User
-   * Create new user without the need to be logged in.
+   * Get Users
+   * @param data The data for the request.
+   * @param data.skip
+   * @param data.limit
+   * @returns UsersPublic Successful Response
+   * @throws ApiError
+   */
+  public static getUsers(
+    data: UsersGetUsersData = {},
+  ): CancelablePromise<UsersGetUsersResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/users/",
+      query: {
+        skip: data.skip,
+        limit: data.limit,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Create User
    * @param data The data for the request.
    * @param data.requestBody
    * @returns UserPublic Successful Response
    * @throws ApiError
    */
-  public static registerUser(
-    data: UsersRegisterUserData,
-  ): CancelablePromise<UsersRegisterUserResponse> {
+  public static createUser(
+    data: UsersCreateUserData,
+  ): CancelablePromise<UsersCreateUserResponse> {
     return __request(OpenAPI, {
       method: "POST",
-      url: "/api/v1/users/signup",
+      url: "/api/v1/users/",
       body: data.requestBody,
       mediaType: "application/json",
       errors: {
@@ -309,7 +1040,6 @@ export class UsersService {
 
   /**
    * Read User By Id
-   * Get a specific user by id.
    * @param data The data for the request.
    * @param data.userId
    * @returns UserPublic Successful Response
@@ -332,7 +1062,6 @@ export class UsersService {
 
   /**
    * Update User
-   * Update a user.
    * @param data The data for the request.
    * @param data.userId
    * @param data.requestBody
@@ -358,7 +1087,6 @@ export class UsersService {
 
   /**
    * Delete User
-   * Delete a user.
    * @param data The data for the request.
    * @param data.userId
    * @returns Message Successful Response

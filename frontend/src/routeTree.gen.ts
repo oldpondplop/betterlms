@@ -17,8 +17,9 @@ import { Route as RecoverPasswordImport } from './routes/recover-password'
 import { Route as LoginImport } from './routes/login'
 import { Route as LayoutImport } from './routes/_layout'
 import { Route as LayoutIndexImport } from './routes/_layout/index'
+import { Route as LayoutTestassignImport } from './routes/_layout/testassign'
 import { Route as LayoutSettingsImport } from './routes/_layout/settings'
-import { Route as LayoutAdmincopyImport } from './routes/_layout/admin copy'
+import { Route as LayoutCourseImport } from './routes/_layout/course'
 import { Route as LayoutAdminImport } from './routes/_layout/admin'
 
 // Create/Update Routes
@@ -53,13 +54,18 @@ const LayoutIndexRoute = LayoutIndexImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 
+const LayoutTestassignRoute = LayoutTestassignImport.update({
+  path: '/testassign',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
 const LayoutSettingsRoute = LayoutSettingsImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
 
-const LayoutAdmincopyRoute = LayoutAdmincopyImport.update({
-  path: '/admin copy',
+const LayoutCourseRoute = LayoutCourseImport.update({
+  path: '/course',
   getParentRoute: () => LayoutRoute,
 } as any)
 
@@ -96,12 +102,16 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminImport
       parentRoute: typeof LayoutImport
     }
-    '/_layout/admin copy': {
-      preLoaderRoute: typeof LayoutAdmincopyImport
+    '/_layout/course': {
+      preLoaderRoute: typeof LayoutCourseImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/settings': {
       preLoaderRoute: typeof LayoutSettingsImport
+      parentRoute: typeof LayoutImport
+    }
+    '/_layout/testassign': {
+      preLoaderRoute: typeof LayoutTestassignImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/': {
@@ -116,8 +126,9 @@ declare module '@tanstack/react-router' {
 export const routeTree = rootRoute.addChildren([
   LayoutRoute.addChildren([
     LayoutAdminRoute,
-    LayoutAdmincopyRoute,
+    LayoutCourseRoute,
     LayoutSettingsRoute,
+    LayoutTestassignRoute,
     LayoutIndexRoute,
   ]),
   LoginRoute,
