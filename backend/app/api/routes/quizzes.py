@@ -1,7 +1,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException
 from typing import List
-from sqlmodel import and_, select, func
+from sqlmodel import and_, select
 from app import crud
 from app.api.deps import SessionDep, SuperuserRequired, CurrentUser
 from app.models import (
@@ -23,10 +23,15 @@ router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 # QUIZ MANAGEMENT
 # ================================
 
-router.post("/", response_model=QuizPublic, dependencies=[SuperuserRequired])
+@router.post("/", response_model=QuizPublic, dependencies=[SuperuserRequired])
 def create_quiz(quiz_in: QuizCreate, session: SessionDep):
     """Create a new quiz. Can be linked to a course or standalone."""
     return crud.create_quiz(session, quiz_in)
+
+@router.get("/", response_model=List[QuizPublic])
+def get_quizzes(session: SessionDep):
+    """Retrieve all quizzes."""
+    return session.exec(select(Quiz)).all()
 
 @router.get("/{quiz_id}", response_model=QuizPublic)
 def get_quiz(quiz_id: uuid.UUID, session: SessionDep):
@@ -42,7 +47,6 @@ def update_quiz(quiz_id: uuid.UUID, quiz_in: QuizUpdate, session: SessionDep):
 def delete_quiz(quiz_id: uuid.UUID, session: SessionDep):
     """Delete a quiz by its ID."""
     return crud.delete_quiz(session, quiz_id)
-
 
 # ================================
 # QUIZ ATTEMPTS MANAGEMENT
@@ -86,7 +90,7 @@ def get_quiz_status(session: SessionDep, quiz_id: uuid.UUID, user_id: uuid.UUID)
     stmt = (
         select(QuizAttempt)
         .where(and_(QuizAttempt.quiz_id == quiz_id, QuizAttempt.user_id == user_id))
-        .order_by(QuizAttempt.attempt_number.desc())  # type: ignore
+        .order_by(QuizAttempt.attempt_number.desc())
         .limit(1)
     )
 
