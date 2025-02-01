@@ -7,7 +7,7 @@ from typing import List, Any
 from sqlmodel import select, func, or_
 from app.api.deps import SessionDep, SuperuserRequired, CurrentUser
 from app.models import (
-    CourseCreate, CourseMaterialPublic, CourseMaterialUpdate, CourseUpdate, Course, CoursePublic, CoursesPublic, Message, QuizAttemptCreate, QuizAttemptPublic, QuizPublic, 
+    CourseCreate, CourseMaterialPublic, CourseMaterialUpdate, CourseProgressPublic, CourseUpdate, Course, CoursePublic, CoursesProgressPublic, CoursesPublic, Message, QuizAttemptCreate, QuizAttemptPublic, QuizPublic, 
     Role, RolesPublic, User, UserPublic, UsersPublic, QuizCreate, QuizUpdate, Quiz, CourseUserLink, CourseRoleLink
 )
 from app import crud
@@ -164,6 +164,32 @@ def remove_course_quiz(course_id: uuid.UUID, session: SessionDep) -> Message:
     session.delete(quiz)
     session.commit()
     return Message(message="Quiz deleted successfully")
+
+
+@router.get("/{course_id}/progress", response_model=CoursesProgressPublic, dependencies=[SuperuserRequired])
+def get_course_progress(course_id: uuid.UUID, session: SessionDep):
+    """Retrieve the progress of all users for a specific course."""
+    if not session.get(Course, course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    users_progress = session.exec(
+        select(User, CourseUserLink.status, CourseUserLink.attempt_count, CourseUserLink.score)
+        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
+        .where(CourseUserLink.course_id == course_id)
+    ).all()
+
+    user_data = [
+        CourseProgressPublic(
+            user=UserPublic.model_validate(user),
+            status=status,
+            attempt_count=attempt_count,
+            score=score
+        )
+        for user, status, attempt_count, score in users_progress
+    ]
+
+    return CoursesProgressPublic(data=user_data, count=len(users_progress))
+
 
 
 # ================================

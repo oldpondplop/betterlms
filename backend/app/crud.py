@@ -260,7 +260,7 @@ def update_quiz(session: Session, quiz_id: UUID, quiz_in: QuizUpdate) -> Quiz:
     session.refresh(db_quiz)
     return db_quiz
 
-def delete_quiz(session: Session, quiz_id: UUID):
+def delete_quiz(session: Session, quiz_id: UUID) -> Message:
     db_quiz = get_quiz_by_id(session, quiz_id)
     session.delete(db_quiz)
     session.commit()

@@ -164,13 +164,27 @@ class CourseMaterialPublic(SQLModel):
 class CourseUpdate(SQLModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    materials: Optional[List[str]] = None
+    # materials: Optional[List[str]] = None
     is_active: Optional[bool] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
 
-class CourseAttachQuiz(SQLModel):
-    quiz_id: uuid.UUID
+class CourseProgressPublic(SQLModel):
+    user: UserPublic
+    status: CourseStatusEnum
+    attempt_count: int
+    score: Optional[int]
+
+class CoursesProgressPublic(SQLModel):
+    data: List[CourseProgressPublic]
+    count: int
+
+class CourseAnalyticsPublic(SQLModel):
+    total_users: int
+    completed_users: int
+    failed_users: int
+    average_attempts: float
+    average_score: Optional[float]
 
 class Course(CourseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
