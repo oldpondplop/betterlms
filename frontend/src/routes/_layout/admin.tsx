@@ -18,7 +18,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect } from "react"
 import { z } from "zod"
 
-import { type UserPublic, UsersService } from "../../client"
+import { type UserPublic, UsersService, RolesService, type RolePublic } from "../../client"
 import AddUser from "../../components/Admin/AddUser"
 import ActionsMenu from "../../components/Common/ActionsMenu"
 import Navbar from "../../components/Common/Navbar"
@@ -38,7 +38,7 @@ const PER_PAGE = 5
 function getUsersQueryOptions({ page }: { page: number }) {
   return {
     queryFn: () =>
-      UsersService.readUsers({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
+      UsersService.getUsers({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
     queryKey: ["users", { page }],
   }
 }
@@ -51,6 +51,7 @@ function UsersTable() {
   const setPage = (page: number) =>
     navigate({ search: (prev: { [key: string]: string }) => ({ ...prev, page }) })
 
+  // Fetch users
   const {
     data: users,
     isPending,
@@ -59,6 +60,19 @@ function UsersTable() {
     ...getUsersQueryOptions({ page }),
     placeholderData: (prevData) => prevData,
   })
+
+  // Fetch roles separately
+  const { data: roles, isLoading: loadingRoles } = useQuery<RolePublic[]>({
+    queryKey: ["roles"],
+    queryFn: () => RolesService.getRoles(),
+  })
+
+  // Function to get role name from role_id
+  const getRoleName = (role_id?: string) => {
+    if (!role_id || loadingRoles || !roles) return "N/A"
+    const role = roles.find((r) => r.id === role_id)
+    return role ? role.name : "N/A"
+  }
 
   const hasNextPage = !isPlaceholderData && users?.data.length === PER_PAGE
   const hasPreviousPage = page > 1
@@ -102,7 +116,7 @@ function UsersTable() {
                   )}
                 </Td>
                 <Td isTruncated maxWidth="200px">{user.email}</Td>
-                <Td>{user.is_superuser ? "Superuser" : user.role_name.charAt(0).toUpperCase() + user.role_name.slice(1)}</Td>
+                <Td>{user.is_superuser ? "Superuser" : getRoleName(user?.role_id || undefined)}</Td>
                 <Td>
                   <Flex gap={2}>
                     <Box w="2" h="2" borderRadius="50%" bg={user.is_active ? "ui.success" : "ui.danger"} alignSelf="center" />
@@ -121,7 +135,6 @@ function UsersTable() {
     </TableContainer>
   )
 }
-
 
 function Admin() {
   return (

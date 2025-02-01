@@ -15,10 +15,10 @@ import {
   ModalOverlay,
   Select,
 } from "@chakra-ui/react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
 
-import { RoleEnum, type UserCreate, UsersService } from "../../client"
+import { type UserCreate, UsersService, RolesService, type RolePublic } from "../../client"
 import type { ApiError } from "../../client/core/ApiError"
 import useCustomToast from "../../hooks/useCustomToast"
 import { emailPattern, handleError } from "../../utils"
@@ -36,6 +36,12 @@ interface UserCreateForm extends UserCreate {
 const AddUser = ({ isOpen, onClose }: AddUserProps) => {
   const queryClient = useQueryClient()
   const showToast = useCustomToast()
+
+  const { data: roles, isLoading: loadingRoles } = useQuery<RolePublic[]>({
+    queryKey: ["roles"],
+    queryFn: () => RolesService.getRoles(),
+  })
+
   const {
     register,
     handleSubmit,
@@ -53,6 +59,7 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
       confirm_password: "",
       is_superuser: false,
       is_active: true,
+      role_id: "", 
     },
   })
 
@@ -84,6 +91,7 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
         <ModalHeader>Add User</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
+          {/* User ID Field */}
           <FormControl isRequired isInvalid={!!errors.user_id}>
             <FormLabel htmlFor="user_id">User ID</FormLabel>
             <Input
@@ -95,6 +103,7 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
             {errors.user_id && <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>}
           </FormControl>
 
+          {/* Full Name Field */}
           <FormControl mt={4} isRequired isInvalid={!!errors.name}>
             <FormLabel htmlFor="name">Full Name</FormLabel>
             <Input
@@ -106,6 +115,7 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
             {errors.name && <FormErrorMessage>{errors.name.message}</FormErrorMessage>}
           </FormControl>
 
+          {/* Email Field */}
           <FormControl mt={4} isRequired isInvalid={!!errors.email}>
             <FormLabel htmlFor="email">Email</FormLabel>
             <Input
@@ -120,16 +130,14 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
             {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
           </FormControl>
 
+          {/* Password Field */}
           <FormControl mt={4} isRequired isInvalid={!!errors.password}>
             <FormLabel htmlFor="password">Password</FormLabel>
             <Input
               id="password"
               {...register("password", {
                 required: "Password is required",
-                minLength: {
-                  value: 8,
-                  message: "Password must be at least 8 characters",
-                },
+                minLength: { value: 8, message: "Password must be at least 8 characters" },
               })}
               placeholder="Password"
               type="password"
@@ -137,35 +145,36 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
             {errors.password && <FormErrorMessage>{errors.password.message}</FormErrorMessage>}
           </FormControl>
 
+          {/* Confirm Password Field */}
           <FormControl mt={4} isRequired isInvalid={!!errors.confirm_password}>
             <FormLabel htmlFor="confirm_password">Confirm Password</FormLabel>
             <Input
               id="confirm_password"
               {...register("confirm_password", {
                 required: "Please confirm your password",
-                validate: (value) =>
-                  value === getValues().password || "The passwords do not match",
+                validate: (value) => value === getValues().password || "The passwords do not match",
               })}
               placeholder="Confirm Password"
               type="password"
             />
-            {errors.confirm_password && (
-              <FormErrorMessage>{errors.confirm_password.message}</FormErrorMessage>
-            )}
+            {errors.confirm_password && <FormErrorMessage>{errors.confirm_password.message}</FormErrorMessage>}
           </FormControl>
-          
-          <FormControl mt={4} isRequired isInvalid={!!errors.role_name}>
-            <FormLabel htmlFor="role_name">Role</FormLabel>
-              <Select id="role_name" {...register("role_name", { required: "Role is required" })}>
-                {Object.entries(RoleEnum).map(([key, role]) => (
-                  <option key={key} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            {errors.role_name && <FormErrorMessage>{errors.role_name.message}</FormErrorMessage>}
-        </FormControl>
 
+          {/* Role Selection Dropdown */}
+          <FormControl mt={4} isRequired isInvalid={!!errors.role_id}>
+            <FormLabel htmlFor="role_id">Role</FormLabel>
+            <Select id="role_id" {...register("role_id", { required: "Role is required" })} isDisabled={loadingRoles}>
+              <option value="">Select a Role</option>
+              {roles?.map((role: RolePublic) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </Select>
+            {errors.role_id && <FormErrorMessage>{errors.role_id.message}</FormErrorMessage>}
+          </FormControl>
+
+          {/* Is Superuser & Is Active Checkboxes */}
           <Flex mt={4}>
             <FormControl>
               <Checkbox {...register("is_superuser")} colorScheme="teal">
@@ -179,6 +188,7 @@ const AddUser = ({ isOpen, onClose }: AddUserProps) => {
             </FormControl>
           </Flex>
         </ModalBody>
+
         <ModalFooter gap={3}>
           <Button variant="primary" type="submit" isLoading={isSubmitting}>
             Save

@@ -15,16 +15,10 @@ import {
   ModalOverlay,
   Select,
 } from "@chakra-ui/react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { type SubmitHandler, useForm } from "react-hook-form"
 
-import {
-  type ApiError,
-  type UserPublic,
-  type UserUpdate,
-  RoleEnum,
-  UsersService,
-} from "../../client"
+import { type ApiError, type UserPublic, type UserUpdate, UsersService, RolesService, type RolePublic } from "../../client"
 import useCustomToast from "../../hooks/useCustomToast"
 import { emailPattern, handleError } from "../../utils"
 
@@ -38,6 +32,12 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
   const queryClient = useQueryClient()
   const showToast = useCustomToast()
 
+  // Fetch roles from backend
+  const { data: roles, isLoading: loadingRoles } = useQuery<RolePublic[]>({
+    queryKey: ["roles"],
+    queryFn: () => RolesService.getRoles(),
+  })
+
   const {
     register,
     handleSubmit,
@@ -47,10 +47,10 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
-      user_id: user.user_id, 
+      user_id: user.user_id,
       name: user.name,
       email: user.email,
-      role_name: user.role_name || undefined,
+      role_id: user.role_id || "", 
       is_superuser: user.is_superuser,
       is_active: user.is_active,
     },
@@ -58,16 +58,14 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
 
   const mutation = useMutation({
     mutationFn: (data: UserUpdate) =>
-      UsersService.updateUser({ userId: user.id, requestBody: data }), 
+      UsersService.updateUser({ userId: user.id, requestBody: data }),
     onSuccess: () => {
       showToast("Success!", "User updated successfully.", "success")
       onClose()
+      queryClient.invalidateQueries({ queryKey: ["users"] }) // Refresh users list
     },
     onError: (err: ApiError) => {
       handleError(err, showToast)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] })
     },
   })
 
@@ -87,7 +85,7 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
         <ModalHeader>Edit User</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
-          {/* Editable User ID (admin-defined, not UUID) */}
+          {/* User ID Field */}
           <FormControl isRequired isInvalid={!!errors.user_id}>
             <FormLabel htmlFor="user_id">User ID</FormLabel>
             <Input
@@ -99,7 +97,7 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
             {errors.user_id && <FormErrorMessage>{errors.user_id.message}</FormErrorMessage>}
           </FormControl>
 
-          {/* Full Name */}
+          {/* Full Name Field */}
           <FormControl mt={4} isRequired isInvalid={!!errors.name}>
             <FormLabel htmlFor="name">Full Name</FormLabel>
             <Input
@@ -110,7 +108,7 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
             {errors.name && <FormErrorMessage>{errors.name.message}</FormErrorMessage>}
           </FormControl>
 
-          {/* Email */}
+          {/* Email Field */}
           <FormControl mt={4} isRequired isInvalid={!!errors.email}>
             <FormLabel htmlFor="email">Email</FormLabel>
             <Input
@@ -123,18 +121,19 @@ const EditUser = ({ user, isOpen, onClose }: EditUserProps) => {
             />
             {errors.email && <FormErrorMessage>{errors.email.message}</FormErrorMessage>}
           </FormControl>
-          
-          {/* Role */}
-          <FormControl mt={4} isRequired isInvalid={!!errors.role_name}>
-            <FormLabel htmlFor="role_name">Role</FormLabel>
-              <Select id="role_name" {...register("role_name", { required: "Role is required" })}>
-                {Object.entries(RoleEnum).map(([key, role]) => (
-                  <option key={key} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            {errors.role_name && <FormErrorMessage>{errors.role_name.message}</FormErrorMessage>}
+
+          {/* Role Selection Dropdown */}
+          <FormControl mt={4} isRequired isInvalid={!!errors.role_id}>
+            <FormLabel htmlFor="role_id">Role</FormLabel>
+            <Select id="role_id" {...register("role_id", { required: "Role is required" })} isDisabled={loadingRoles}>
+              <option value="">Select a Role</option>
+              {roles?.map((role: RolePublic) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </Select>
+            {errors.role_id && <FormErrorMessage>{errors.role_id.message}</FormErrorMessage>}
           </FormControl>
 
           {/* Checkboxes for Superuser & Active Status */}
