@@ -35,6 +35,24 @@ export const Route = createFileRoute("/_layout/course")({
 
 const PER_PAGE = 5
 
+// Query options functions
+function getCoursesQueryOptions({ page }: { page: number }) {
+  return {
+    queryKey: ["courses", { page }],
+    queryFn: () => CoursesService.readCourses({
+      skip: (page - 1) * PER_PAGE,
+      limit: PER_PAGE
+    }),
+  }
+}
+
+function getCourseDetailsQueryOptions(courseId: string) {
+  return {
+    queryKey: ["courseDetails", courseId],
+    queryFn: () => CoursesService.readCourse({ courseId }),
+  }
+}
+
 const RolesBadge = ({ count }: { count: number }) => (
   <Badge
     bg="rgba(0, 150, 255, 0.1)"
@@ -63,9 +81,60 @@ const UsersBadge = ({ count }: { count: number }) => (
   </Badge>
 )
 
-function CoursesTable() {
+function CourseRow({ course }: { course: CourseDetailed }) {
   const queryClient = useQueryClient()
   const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
+  const { data: courseDetails } = useQuery(getCourseDetailsQueryOptions(course.id))
+  
+  const rolesCount = courseDetails?.roles?.length || course.roles?.length || 0
+  const usersCount = courseDetails?.users?.length || course.users?.length || 0
+
+  return (
+    <Tr>
+      <Td isTruncated maxWidth="200px">
+        {course.title}
+      </Td>
+      <Td isTruncated maxWidth="300px">
+        {course.description || "No description"}
+      </Td>
+      <Td>
+        <Flex gap={2}>
+          <Box
+            w="2"
+            h="2"
+            borderRadius="50%"
+            bg={course.is_active ? "ui.success" : "ui.danger"}
+            alignSelf="center"
+          />
+          {course.is_active ? "Active" : "Inactive"}
+        </Flex>
+      </Td>
+      <Td>
+        {course.quiz ? (
+          <Badge colorScheme="green">Available</Badge>
+        ) : (
+          <Badge colorScheme="gray">No Quiz</Badge>
+        )}
+      </Td>
+      <Td>
+        <RolesBadge count={rolesCount} />
+      </Td>
+      <Td>
+        <UsersBadge count={usersCount} />
+      </Td>
+      <Td>
+        <ActionsMenu
+          type="Course"
+          value={course}
+          disabled={!currentUser?.is_superuser}
+        />
+      </Td>
+    </Tr>
+  )
+}
+
+function CoursesTable() {
+  const queryClient = useQueryClient()
   const { page } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const setPage = (page: number) =>
@@ -75,25 +144,26 @@ function CoursesTable() {
     data: coursesResponse,
     isPending,
     isPlaceholderData,
-  } = useQuery<{ data: CourseDetailed[], count: number }>({
-    queryFn: () => CoursesService.readCourses({ 
-      skip: (page - 1) * PER_PAGE, 
-      limit: PER_PAGE 
-    }),
-    queryKey: ["courses", { page }],
+  } = useQuery({
+    ...getCoursesQueryOptions({ page }),
     placeholderData: (prevData) => prevData,
   })
 
-  const courses = coursesResponse?.data || []
-  const hasNextPage = !isPlaceholderData && courses.length === PER_PAGE
+  // Prefetch course details for each course
+  useEffect(() => {
+    if (coursesResponse?.data) {
+      coursesResponse.data.forEach((course) => {
+        queryClient.prefetchQuery(getCourseDetailsQueryOptions(course.id))
+      })
+    }
+  }, [coursesResponse?.data, queryClient])
+
+  const hasNextPage = !isPlaceholderData && coursesResponse?.data.length === PER_PAGE
   const hasPreviousPage = page > 1
 
   useEffect(() => {
     if (hasNextPage) {
-      void queryClient.prefetchQuery({
-        queryKey: ["courses", { page: page + 1 }],
-        queryFn: () => CoursesService.readCourses({ skip: page * PER_PAGE, limit: PER_PAGE }),
-      })
+      queryClient.prefetchQuery(getCoursesQueryOptions({ page: page + 1 }))
     }
   }, [hasNextPage, page, queryClient])
 
@@ -124,47 +194,8 @@ function CoursesTable() {
             </Tbody>
           ) : (
             <Tbody>
-              {courses?.map((course) => (
-                <Tr key={course.id}>
-                  <Td isTruncated maxWidth="200px">
-                    {course.title}
-                  </Td>
-                  <Td isTruncated maxWidth="300px">
-                    {course.description || "No description"}
-                  </Td>
-                  <Td>
-                    <Flex gap={2}>
-                      <Box
-                        w="2"
-                        h="2"
-                        borderRadius="50%"
-                        bg={course.is_active ? "ui.success" : "ui.danger"}
-                        alignSelf="center"
-                      />
-                      {course.is_active ? "Active" : "Inactive"}
-                    </Flex>
-                  </Td>
-                  <Td>
-                    {course.quiz ? (
-                      <Badge colorScheme="green">Available</Badge>
-                    ) : (
-                      <Badge colorScheme="gray">No Quiz</Badge>
-                    )}
-                  </Td>
-                  <Td>
-                    <RolesBadge count={course.roles?.length || 0} />
-                  </Td>
-                  <Td>
-                    <UsersBadge count={course.users?.length || 0} />
-                  </Td>
-                  <Td>
-                    <ActionsMenu
-                      type="Course"
-                      value={course}
-                      disabled={!currentUser?.is_superuser}
-                    />
-                  </Td>
-                </Tr>
+              {coursesResponse?.data.map((course) => (
+                <CourseRow key={course.id} course={course} />
               ))}
             </Tbody>
           )}

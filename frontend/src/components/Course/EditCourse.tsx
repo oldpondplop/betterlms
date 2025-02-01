@@ -184,6 +184,18 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
     onError: (err: ApiError) => {
       handleError(err, showToast)
     },
+    onSettled: () => {
+      // Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: ["users"] })
+      if (users) {
+        users?.data.forEach(user => {
+          queryClient.invalidateQueries({ queryKey: ["userDetails", user.id] })
+        })
+      }
+      queryClient.invalidateQueries({ queryKey: ["roles"] })
+      queryClient.invalidateQueries({ queryKey: ["courses"] })  // Add this
+      queryClient.invalidateQueries({ queryKey: ["courseDetails"] })  // Add this if not already present
+    },
   })
 
   const onSubmit: SubmitHandler<FormInputs> = async (data) => {

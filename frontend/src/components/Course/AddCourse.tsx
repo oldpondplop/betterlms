@@ -19,55 +19,53 @@ import {
   MenuList,
   MenuItem,
   Icon,
-  Flex,
-  Tag,
-  TagLabel,
-  TagCloseButton,
   Box,
   InputGroup,
   InputLeftElement,
   Grid,
   GridItem,
-} from "@chakra-ui/react";
-import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons';
-import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser } from "react-icons/fa";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type SubmitHandler, useForm, Controller } from "react-hook-form";
-import { useState } from "react";
+  Checkbox,
+  Text,
+} from "@chakra-ui/react"
+import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
+import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser } from "react-icons/fa"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { type SubmitHandler, useForm, Controller } from "react-hook-form"
+import { useState } from "react"
 import { 
   type CourseCreate, 
   CoursesService,
   RolesService,
   UsersService,
-} from "../../client";
-import useCustomToast from "../../hooks/useCustomToast";
+} from "../../client"
+import useCustomToast from "../../hooks/useCustomToast"
 
 interface AddCourseProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen: boolean
+  onClose: () => void
 }
 
 interface FormInputs extends CourseCreate {
-  role_ids: string[];
-  user_ids: string[]; // New field for user assignments
+  role_ids: string[]
+  user_ids: string[]
 }
 
 const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
-  const queryClient = useQueryClient();
-  const showToast = useCustomToast();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [userSearchQuery, setUserSearchQuery] = useState(""); // New state for user search
-  const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient()
+  const showToast = useCustomToast()
+  const [roleSearchQuery, setRoleSearchQuery] = useState("")
+  const [userSearchQuery, setUserSearchQuery] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   const { data: roles } = useQuery({
     queryKey: ["roles"],
     queryFn: () => RolesService.getRoles(),
-  });
+  })
 
   const { data: users } = useQuery({
     queryKey: ["users"],
     queryFn: () => UsersService.getUsers(),
-  });
+  })
 
   const {
     register,
@@ -85,75 +83,92 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
       start_date: null,
       end_date: null,
       role_ids: [],
-      user_ids: [], // Initialize user_ids
+      user_ids: [],
     },
-  });
+  })
 
-  const onSubmit: SubmitHandler<FormInputs> = async (data) => {
-    try {
-      setSubmitting(true);
+  const handleClose = () => {
+    reset()
+    onClose()
+  }
 
-      // Create course
-      const course = await CoursesService.createCourse({ 
-        requestBody: {
-          title: data.title,
-          description: data.description,
-          materials: data.materials || [],
-          is_active: data.is_active,
-          start_date: data.start_date ? new Date(data.start_date).toISOString().split('T')[0] : null,
-          end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : null,
+  // Filter roles based on search
+  const filteredRoles = roles?.data?.filter(role => 
+    role.name.toLowerCase().includes(roleSearchQuery.toLowerCase())
+  ) || []
+
+  // Filter users based on search
+  const filteredUsers = users?.data?.filter(user => 
+    user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    user.email.toLowerCase().includes(userSearchQuery.toLowerCase())
+  ) || []
+
+  const mutation = useMutation({
+    mutationFn: async (data: FormInputs) => {
+      setSubmitting(true)
+      try {
+        const course = await CoursesService.createCourse({ 
+          requestBody: {
+            title: data.title,
+            description: data.description,
+            materials: data.materials || [],
+            is_active: data.is_active,
+            start_date: data.start_date ? new Date(data.start_date).toISOString().split('T')[0] : null,
+            end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : null,
+          }
+        })
+
+        if (data.role_ids?.length > 0) {
+          for (const roleId of data.role_ids) {
+            await CoursesService.assignRoleToCourse({
+              courseId: course.id,
+              roleId: roleId,
+            })
+          }
         }
-      });
 
-      // If roles are selected, assign them
-      if (data.role_ids?.length > 0) {
-        for (const roleId of data.role_ids) {
-          await CoursesService.assignRoleToCourse({
-            courseId: course.id,
-            roleId: roleId,
-          });
+        if (data.user_ids?.length > 0) {
+          for (const userId of data.user_ids) {
+            await CoursesService.assignUserToCourse({
+              courseId: course.id,
+              userId: userId,
+            })
+          }
         }
+
+        return course
+      } finally {
+        setSubmitting(false)
       }
-
-      // If users are selected, assign them
-      if (data.user_ids?.length > 0) {
-        for (const userId of data.user_ids) {
-          await CoursesService.assignUserToCourse({
-            courseId: course.id,
-            userId: userId,
-          });
-        }
-      }
-
-      showToast("Success!", "Course created and assigned successfully.", "success");
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      reset();
-      onClose();
-    } catch (error) {
-      console.error('Error:', error);
+    },
+    onSuccess: () => {
+      showToast("Success!", "Course created successfully.", "success")
+      queryClient.invalidateQueries({ queryKey: ["courses"] })
+      handleClose()
+    },
+    onError: (error) => {
       showToast(
         "Error",
         error instanceof Error ? error.message : "Failed to create course",
         "error"
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      )
+    },
+  })
 
-  const filteredRoles = roles?.data?.filter(role => 
-    role.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
-
-  const filteredUsers = users?.data?.filter(user => 
-    user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
-  ) || [];
+  const onSubmit: SubmitHandler<FormInputs> = async (data) => {
+    mutation.mutate(data)
+  }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size={{ base: "sm", md: "lg" }} isCentered>
+    <Modal 
+      isOpen={isOpen} 
+      onClose={handleClose}
+      size={{ base: "sm", md: "lg" }}
+      isCentered
+    >
       <ModalOverlay />
       <ModalContent as="form" onSubmit={handleSubmit(onSubmit)}>
-        <ModalHeader>Add Course</ModalHeader>
+        <ModalHeader>Add New Course</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
           <VStack spacing={4} align="stretch">
@@ -233,73 +248,65 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
               <Controller
                 name="role_ids"
                 control={control}
-                defaultValue={[]}
                 render={({ field: { value, onChange } }) => (
-                  <>
+                  <Box width="100%">
                     <Menu closeOnSelect={false}>
                       <MenuButton 
-                        as={Button} 
+                        as={Button}
+                        width="100%"
                         rightIcon={<ChevronDownIcon />}
-                        w="100%"
                         textAlign="left"
-                        variant="outline"
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
                       >
                         {value.length ? `${value.length} role(s) selected` : 'Select roles'}
                       </MenuButton>
-                      <MenuList maxH="200px" overflowY="auto">
-                        <Box px={4} pb={2}>
-                          <InputGroup size="sm">
+                      <MenuList width="100%">
+                        <Box px={4} py={2}>
+                          <InputGroup>
                             <InputLeftElement>
-                              <SearchIcon color="gray.400" />
+                              <SearchIcon color="gray.500" />
                             </InputLeftElement>
                             <Input
                               placeholder="Search roles..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
+                              value={roleSearchQuery}
+                              onChange={(e) => setRoleSearchQuery(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
                             />
                           </InputGroup>
                         </Box>
-                        {filteredRoles.map((role) => (
-                          <MenuItem
-                            key={role.id}
-                            onClick={() => {
-                              if (!value.includes(role.id)) {
-                                onChange([...value, role.id]);
-                              }
-                            }}
-                          >
-                            {role.name}
-                          </MenuItem>
-                        ))}
+                        {filteredRoles.length === 0 ? (
+                          <Box px={4} py={2}>
+                            <Text color="gray.500">No roles found</Text>
+                          </Box>
+                        ) : (
+                          filteredRoles.map((role) => (
+                            <MenuItem
+                              key={role.id}
+                              onClick={() => {
+                                const newValue = value.includes(role.id)
+                                  ? value.filter(id => id !== role.id)
+                                  : [...value, role.id]
+                                onChange(newValue)
+                              }}
+                            >
+                              <Checkbox 
+                                isChecked={value.includes(role.id)}
+                                mr={2}
+                              >
+                                {role.name}
+                              </Checkbox>
+                            </MenuItem>
+                          ))
+                        )}
                       </MenuList>
                     </Menu>
-                    <Flex mt={2} gap={2} flexWrap="wrap">
-                      {value.map((roleId) => {
-                        const role = roles?.data.find(r => r.id === roleId);
-                        return role ? (
-                          <Tag
-                            key={roleId}
-                            size="md"
-                            borderRadius="full"
-                            variant="solid"
-                            colorScheme="blue"
-                          >
-                            <TagLabel>{role.name}</TagLabel>
-                            <TagCloseButton
-                              onClick={() => {
-                                onChange(value.filter(id => id !== roleId));
-                              }}
-                            />
-                          </Tag>
-                        ) : null;
-                      })}
-                    </Flex>
-                  </>
+                  </Box>
                 )}
               />
             </FormControl>
 
-            {/* New Section: Assign to Users */}
             <FormControl>
               <FormLabel>
                 <Icon as={FaUser} mr={2} />
@@ -308,68 +315,61 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
               <Controller
                 name="user_ids"
                 control={control}
-                defaultValue={[]}
                 render={({ field: { value, onChange } }) => (
-                  <>
+                  <Box width="100%">
                     <Menu closeOnSelect={false}>
                       <MenuButton 
-                        as={Button} 
+                        as={Button}
+                        width="100%"
                         rightIcon={<ChevronDownIcon />}
-                        w="100%"
                         textAlign="left"
-                        variant="outline"
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
                       >
                         {value.length ? `${value.length} user(s) selected` : 'Select users'}
                       </MenuButton>
-                      <MenuList maxH="200px" overflowY="auto">
-                        <Box px={4} pb={2}>
-                          <InputGroup size="sm">
+                      <MenuList width="100%">
+                        <Box px={4} py={2}>
+                          <InputGroup>
                             <InputLeftElement>
-                              <SearchIcon color="gray.400" />
+                              <SearchIcon color="gray.500" />
                             </InputLeftElement>
                             <Input
                               placeholder="Search users..."
                               value={userSearchQuery}
                               onChange={(e) => setUserSearchQuery(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
                             />
                           </InputGroup>
                         </Box>
-                        {filteredUsers.map((user) => (
-                          <MenuItem
-                            key={user.id}
-                            onClick={() => {
-                              if (!value.includes(user.id)) {
-                                onChange([...value, user.id]);
-                              }
-                            }}
-                          >
-                            {user.name}
-                          </MenuItem>
-                        ))}
+                        {filteredUsers.length === 0 ? (
+                          <Box px={4} py={2}>
+                            <Text color="gray.500">No users found</Text>
+                          </Box>
+                        ) : (
+                          filteredUsers.map((user) => (
+                            <MenuItem
+                              key={user.id}
+                              onClick={() => {
+                                const newValue = value.includes(user.id)
+                                  ? value.filter(id => id !== user.id)
+                                  : [...value, user.id]
+                                onChange(newValue)
+                              }}
+                            >
+                              <Checkbox 
+                                isChecked={value.includes(user.id)}
+                                mr={2}
+                              >
+                                {user.name} ({user.email})
+                              </Checkbox>
+                            </MenuItem>
+                          ))
+                        )}
                       </MenuList>
                     </Menu>
-                    <Flex mt={2} gap={2} flexWrap="wrap">
-                      {value.map((userId) => {
-                        const user = users?.data.find(u => u.id === userId);
-                        return user ? (
-                          <Tag
-                            key={userId}
-                            size="md"
-                            borderRadius="full"
-                            variant="solid"
-                            colorScheme="blue"
-                          >
-                            <TagLabel>{user.name}</TagLabel>
-                            <TagCloseButton
-                              onClick={() => {
-                                onChange(value.filter(id => id !== userId));
-                              }}
-                            />
-                          </Tag>
-                        ) : null;
-                      })}
-                    </Flex>
-                  </>
+                  </Box>
                 )}
               />
             </FormControl>
@@ -394,13 +394,13 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
             type="submit"
             isLoading={submitting}
           >
-            Save
+            Create Course
           </Button>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={handleClose}>Cancel</Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
-  );
-};
+  )
+}
 
-export default AddCourse;
+export default AddCourse
