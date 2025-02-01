@@ -7,7 +7,7 @@ from typing import List, Any
 from sqlmodel import select, func, or_
 from app.api.deps import SessionDep, SuperuserRequired, CurrentUser
 from app.models import (
-    CourseCreate, CourseMaterialPublic, CourseMaterialUpdate, CourseProgressPublic, CourseUpdate, Course, CoursePublic, CoursesProgressPublic, CoursesPublic, Message, QuizAttemptCreate, QuizAttemptPublic, QuizPublic, 
+    CourseAnalyticsPublic, CourseCreate, CourseMaterialPublic, CourseMaterialUpdate, CourseProgressPublic, CourseStatusEnum, CourseUpdate, Course, CoursePublic, CoursesProgressPublic, CoursesPublic, Message, QuizAttemptCreate, QuizAttemptPublic, QuizPublic, 
     Role, RolesPublic, User, UserPublic, UsersPublic, QuizCreate, QuizUpdate, Quiz, CourseUserLink, CourseRoleLink
 )
 from app import crud
@@ -190,7 +190,41 @@ def get_course_progress(course_id: uuid.UUID, session: SessionDep):
 
     return CoursesProgressPublic(data=user_data, count=len(users_progress))
 
-
+@router.get("/{course_id}/analytics", response_model=CourseAnalyticsPublic, dependencies=[SuperuserRequired])
+def get_course_analytics(course_id: uuid.UUID, session: SessionDep):
+    """Retrieve analytics for a specific course."""
+    if not session.get(Course, course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    total_users = session.exec(
+        select(func.count()).select_from(CourseUserLink).where(CourseUserLink.course_id == course_id)
+    ).one()
+    
+    completed_users = session.exec(
+        select(func.count()).select_from(CourseUserLink)
+        .where(CourseUserLink.course_id == course_id, CourseUserLink.status == CourseStatusEnum.COMPLETED)
+    ).one()
+    
+    failed_users = session.exec(
+        select(func.count()).select_from(CourseUserLink)
+        .where(CourseUserLink.course_id == course_id, CourseUserLink.status == CourseStatusEnum.FAILED)
+    ).one()
+    
+    avg_attempts = session.exec(
+        select(func.avg(CourseUserLink.attempt_count)).where(CourseUserLink.course_id == course_id)
+    ).one()
+    
+    avg_score = session.exec(
+        select(func.avg(CourseUserLink.score)).where(CourseUserLink.course_id == course_id, CourseUserLink.score.isnot(None))
+    ).one()
+    
+    return CourseAnalyticsPublic(
+        total_users=total_users,
+        completed_users=completed_users,
+        failed_users=failed_users,
+        average_attempts=avg_attempts or 0.0,
+        average_score=avg_score
+    )
 
 # ================================
 # FILE UPLOADS & MATERIALS
