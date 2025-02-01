@@ -1,17 +1,16 @@
-from typing import List, Optional, Sequence, Type
+from typing import List, Optional, Sequence
 from uuid import UUID
 from sqlmodel import SQLModel, Session, select
 from fastapi import HTTPException
 from sqlalchemy import func
 
 from app.models import (
-    CourseRoleLink,
-    CourseUserLink,
+    QuizAttempt,
+    QuizAttemptCreate,
+    UpdatePassword,
     User,
     UserCreate,
     UserUpdate,
-    UserUpdateMe,
-    UpdatePassword,
     Role,
     RoleCreate,
     RoleUpdate,
@@ -20,9 +19,11 @@ from app.models import (
     CourseUpdate,
     Quiz,
     QuizUpdate,
-    QuizCreate
+    QuizCreate,
+    Message,
+    UserUpdateMe
 )
-from app.core.security import verify_password, get_password_hash 
+from app.core.security import get_password_hash, verify_password
 
 
 # ===========================
@@ -65,7 +66,7 @@ def update_user(session: Session, db_user: User, user_in: UserUpdate) -> User:
     """Partially update an existing User with the fields in UserUpdate."""
     user_data = user_in.model_dump(exclude_unset=True)
     db_user.sqlmodel_update(user_data)
-    session.add(db_user)
+    # session.add(db_user)
     session.commit()
     session.refresh(db_user)
     return db_user
@@ -77,17 +78,15 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
         user_data["hashed_password"] = get_password_hash(user_data.pop("new_password"))
     
     db_user.sqlmodel_update(user_data)
-    session.add(db_user)
+    # session.add(db_user)
     session.commit()
     session.refresh(db_user)
     return db_user
 
 
-#
 # ===========================
 #  ROLE CRUD
 # ===========================
-#
 
 def get_role_by_id(session: Session, role_id: UUID) -> Optional[Role]:
     return session.get(Role, role_id)
@@ -117,7 +116,7 @@ def create_role(session: Session, role_in: RoleCreate) -> Role:
 def update_role(session: Session, db_role: Role, role_in: RoleUpdate) -> Role:
     update_data = role_in.model_dump(exclude_unset=True)
     db_role.sqlmodel_update(update_data)
-    session.add(db_role)
+    # session.add(db_role)
     session.commit()
     session.refresh(db_role)
     return db_role
@@ -129,7 +128,7 @@ def delete_role(session: Session, role_id: UUID) -> Role:
     session.delete(db_role)
     session.commit()
     return db_role
-
+    # return Message(message="Role deleted successfully")
 
 # ===========================
 #  COURSE CRUD
@@ -155,46 +154,137 @@ def create_course(session: Session, course_create: CourseCreate) -> Course:
 def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
     course_data = course_in.model_dump(exclude_unset=True)
     db_course.sqlmodel_update(course_data)
-
-    session.add(db_course)
     session.commit()
     session.refresh(db_course)
     return db_course
 
-def add_course_material(session: Session, db_course: Course, file_name: str) -> Course:
-    if file_name not in db_course.materials:
-        db_course.materials.append(file_name)
-    session.add(db_course)
+def delete_course(session: Session, course_id: UUID) -> Message:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    session.delete(db_course)
     session.commit()
-    session.refresh(db_course)
-    return db_course
+    return Message(message="Course deleted successfully")
 
-def remove_course_material(session: Session, db_course: Course, file_name: str) -> Course:
-    if file_name in db_course.materials:
-        db_course.materials.remove(file_name)
-        session.add(db_course)
+
+# ===========================
+#  ROLE & USER ASSIGNMENT
+# ===========================
+
+def assign_role_to_course(session: Session, course_id: UUID, role_id: UUID) -> Course:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    db_role = session.get(Role, role_id)
+    if not db_role:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    if db_role not in db_course.roles:
+        db_course.roles.append(db_role)
         session.commit()
         session.refresh(db_course)
+
     return db_course
 
+def unassign_role_from_course(session: Session, course_id: UUID, role_id: UUID) -> Message:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    db_role = session.get(Role, role_id)
+    if not db_role or db_role not in db_course.roles:
+        raise HTTPException(status_code=404, detail="Role not linked to course")
+
+    db_course.roles.remove(db_role)
+    session.commit()
+    return Message(message="Role unassigned successfully")
+
+def assign_user_to_course(session: Session, course_id: UUID, user_id: UUID) -> Course:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    db_user = session.get(User, user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if db_user not in db_course.users:
+        db_course.users.append(db_user)
+        session.commit()
+        session.refresh(db_course)
+
+    return db_course
+
+def unassign_user_from_course(session: Session, course_id: UUID, user_id: UUID) -> Message:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    db_user = session.get(User, user_id)
+    if not db_user or db_user not in db_course.users:
+        raise HTTPException(status_code=404, detail="User not linked to course")
+
+    db_course.users.remove(db_user)
+    session.commit()
+    return Message(message="User unassigned successfully")
+
 
 # ===========================
-#  Quiz CRUD
+#  QUIZ CRUD
 # ===========================
 
-def create_quiz(session: Session, quiz_in: QuizCreate, course_id: Optional[UUID] = None) -> Quiz:
+def get_quiz_by_course_id(session: Session, course_id: UUID) -> Optional[Quiz]:
+    stmt = select(Quiz).where(Quiz.course_id == course_id)
+    return session.exec(stmt).first()
+
+def get_quiz_by_id(session: Session, quiz_id: UUID) -> Quiz:
+    quiz = session.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    return quiz
+
+def create_quiz(session: Session, quiz_in: QuizCreate) -> Quiz:
     db_quiz = Quiz.model_validate(quiz_in)
-    if course_id:
-        db_quiz.course_id = course_id
     session.add(db_quiz)
     session.commit()
     session.refresh(db_quiz)
     return db_quiz
 
-def update_quiz(session: Session, db_quiz: Quiz, quiz_in: QuizUpdate) -> Quiz:
-    quiz_data = quiz_in.model_dump(exclude_unset=True)
-    db_quiz.sqlmodel_update(quiz_data)
-    session.add(db_quiz)
+def update_quiz(session: Session, quiz_id: UUID, quiz_in: QuizUpdate) -> Quiz:
+    db_quiz = get_quiz_by_id(session, quiz_id)
+    update_data = quiz_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_quiz, key, value)
     session.commit()
     session.refresh(db_quiz)
     return db_quiz
+
+def delete_quiz(session: Session, quiz_id: UUID):
+    db_quiz = get_quiz_by_id(session, quiz_id)
+    session.delete(db_quiz)
+    session.commit()
+    return Message(message="Quiz deleted successfully")
+
+
+# ===========================
+# QUIZ ATTEMPT CRUD OPERATIONS
+# ===========================
+
+def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> QuizAttempt:
+    """Record a new quiz attempt for a user."""
+    quiz_attempt = QuizAttempt.model_validate(attempt_in)
+    
+    # Ensure user has not exceeded max attempts
+    existing_attempts = session.exec(
+        select(QuizAttempt).where(QuizAttempt.quiz_id == attempt_in.quiz_id, QuizAttempt.user_id == attempt_in.user_id)
+    ).all()
+
+    quiz = get_quiz_by_id(session, attempt_in.quiz_id)
+    if len(existing_attempts) >= quiz.max_attempts:
+        raise HTTPException(status_code=400, detail="Max attempts exceeded")
+
+    session.add(quiz_attempt)
+    session.commit()
+    session.refresh(quiz_attempt)
+    return quiz_attempt
