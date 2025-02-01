@@ -7,6 +7,7 @@ from sqlalchemy import ForeignKey
 from sqlmodel import Field, Relationship, SQLModel, Column
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.types import JSON
+
 # =========================================================
 #  Enums
 # =========================================================
@@ -22,40 +23,16 @@ class CourseStatusEnum(str, Enum):
 # ================================
 
 class CourseRoleLink(SQLModel, table=True):
-    course_id: uuid.UUID = Field(
-        sa_column=Column(
-            ForeignKey("course.id", ondelete="CASCADE"),
-            primary_key=True,
-            nullable=False
-        )
-    )
-    role_id: uuid.UUID = Field(
-        sa_column=Column(
-            ForeignKey("role.id", ondelete="CASCADE"),
-            primary_key=True,
-            nullable=False
-        )
-    )
-
+    course_id: uuid.UUID = Field(sa_column=Column(ForeignKey("course.id", ondelete="CASCADE"), primary_key=True))
+    role_id: uuid.UUID = Field(sa_column=Column(ForeignKey("role.id", ondelete="CASCADE"), primary_key=True))
 
 class CourseUserLink(SQLModel, table=True):
-    course_id: uuid.UUID = Field(
-        sa_column=Column(
-            ForeignKey("course.id", ondelete="CASCADE"),
-            primary_key=True,
-            nullable=False
-        )
-    )
-    user_id: uuid.UUID = Field(
-        sa_column=Column(
-            ForeignKey("user.id", ondelete="CASCADE"),
-            primary_key=True,
-            nullable=False
-        )
-    )
+    course_id: uuid.UUID = Field(sa_column=Column(ForeignKey("course.id", ondelete="CASCADE"), primary_key=True))
+    user_id: uuid.UUID = Field(sa_column=Column(ForeignKey("user.id", ondelete="CASCADE"), primary_key=True))
     status: CourseStatusEnum = Field(default=CourseStatusEnum.ASSIGNED)
-    attempt_count: int = 0
-    score: Optional[int] = None
+    attempt_count: int = Field(default=0, description="Number of quiz attempts made by the user")
+    score: Optional[int] = Field(default=None, description="Highest quiz score achieved")
+
 
 # ================================
 # ROLE MODELS
@@ -79,14 +56,10 @@ class RoleUpdate(SQLModel):
 
 class Role(RoleBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    
     # A single Role can have many Users
     users: List["User"] = Relationship(back_populates="role")
     # Many-to-many with Courses
-    courses: List["Course"] = Relationship(
-        back_populates="roles",
-        link_model=CourseRoleLink
-    )
+    courses: List["Course"] = Relationship(back_populates="roles", link_model=CourseRoleLink)
 
 
 # ================================
@@ -180,6 +153,14 @@ class CoursesPublic(SQLModel):
     data: List[CoursePublic]
     count: int
 
+class CourseMaterialUpdate(SQLModel):
+    remove_files: List[str] = []
+    new_files: List[str] = []
+
+class CourseMaterialPublic(SQLModel):
+    course_id: uuid.UUID
+    materials: List[str]
+
 class CourseUpdate(SQLModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -214,6 +195,7 @@ class Course(CourseBase, table=True):
 # ================================
 # QUIZ MODELS
 # ================================
+
 class QuizQuestion(SQLModel):
     question: str
     choices: List[str]
@@ -225,15 +207,11 @@ class QuizBase(SQLModel):
     questions: List[QuizQuestion] = Field(default_factory=list, sa_column=Column(JSON))
 
 class QuizCreate(QuizBase):
-    course_id: uuid.UUID
+    course_id: Optional[uuid.UUID]
 
 class QuizPublic(QuizBase):
     id: uuid.UUID
-    course_id: uuid.UUID
-
-class QuizzesPublic(SQLModel):
-    data: List[QuizPublic]
-    count: int
+    course_id: Optional[uuid.UUID]
 
 class QuizUpdate(SQLModel):
     max_attempts: Optional[int] = None
@@ -245,11 +223,7 @@ class Quiz(QuizBase, table=True):
     
     # Relationship back to the Course model
     course_id: Optional[uuid.UUID] = Field(
-        sa_column=Column(
-            ForeignKey("course.id", ondelete="CASCADE"), 
-            unique=True, 
-            nullable=True
-        )
+        sa_column=Column(ForeignKey("course.id", ondelete="CASCADE"), unique=True, nullable=True)
     )
     course: Optional[Course] = Relationship(back_populates="quiz")
     # Relationship to track user attempts
@@ -274,10 +248,6 @@ class QuizAttemptPublic(QuizAttemptBase):
     quiz_id: uuid.UUID
     user_id: uuid.UUID
 
-class QuizAttemptsPublic(SQLModel):
-    data: List[QuizAttemptPublic]
-    count: int
-
 class QuizAttemptUpdate(SQLModel):
     score: Optional[int] = None
     attempt_number: Optional[int] = None
@@ -285,31 +255,10 @@ class QuizAttemptUpdate(SQLModel):
 
 class QuizAttempt(QuizAttemptBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
-    quiz_id: uuid.UUID = Field(
-        sa_column=Column(
-            ForeignKey("quiz.id", ondelete="CASCADE"),
-            nullable=False
-        )
-    )
+    quiz_id: uuid.UUID = Field(sa_column=Column(ForeignKey("quiz.id", ondelete="CASCADE"), nullable=False))
+    user_id: uuid.UUID = Field(sa_column=Column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False))
     quiz: Quiz = Relationship(back_populates="attempts")
-
-    user_id: uuid.UUID = Field(
-        sa_column=Column(
-            ForeignKey("user.id", ondelete="CASCADE"),
-            nullable=False
-        )
-    )
     user: User = Relationship(back_populates="quiz_attempts")
-
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime | None = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        nullable=False,
-        sa_column_kwargs={
-            "onupdate": lambda: datetime.now(timezone.utc),
-        },
-    )
 
 
 # =========================================================
