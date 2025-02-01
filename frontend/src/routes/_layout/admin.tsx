@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_layout/admin")({
   validateSearch: (search) => usersSearchSchema.parse(search),
 })
 
-const PER_PAGE = 5
+const PER_PAGE = 10
 
 function getUsersQueryOptions({ page }: { page: number }) {
   return {
