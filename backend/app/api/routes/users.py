@@ -14,7 +14,6 @@ from app.models import (
     User,
     UserCreate,
     UserPublic,
-    UsersPublic,
     UserUpdate,
     UserUpdateMe,
 )
@@ -48,11 +47,9 @@ def update_password_me(*, session: SessionDep, body: UpdatePassword, current_use
     crud.update_user_me(session=session, db_user=current_user, user_in=body)
     return Message(message="Password updated successfully")
 
-@router.get("/", response_model=UsersPublic, dependencies=[SuperuserRequired])
+@router.get("/", response_model=list[UserPublic], dependencies=[SuperuserRequired])
 def get_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
-    count = crud.count_users(session)
-    data = crud.get_users(session, skip=skip, limit=limit)
-    return UsersPublic(data=data, count=count)
+    return crud.get_users(session, skip=skip, limit=limit)
 
 @router.get("/{user_id}", response_model=UserPublic, dependencies=[SuperuserRequired])
 def read_user_by_id(user_id: uuid.UUID, session: SessionDep) -> Any:
