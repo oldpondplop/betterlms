@@ -30,6 +30,9 @@ class CourseRoleLink(SQLModel, table=True):
 class CourseUserLink(SQLModel, table=True):
     course_id: uuid.UUID = Field(sa_column=Column(ForeignKey("course.id", ondelete="CASCADE"), primary_key=True))
     user_id: uuid.UUID = Field(sa_column=Column(ForeignKey("user.id", ondelete="CASCADE"), primary_key=True))
+    status: StatusEnum = Field(default=StatusEnum.ASSIGNED)
+    attempt_count: int = Field(default=0, description="Number of quiz attempts made by the user")
+    score: Optional[int] = Field(default=None, description="Highest quiz score achieved")
 
 # ================================
 # ROLE MODELS
@@ -140,13 +143,13 @@ class CourseUpdate(SQLModel):
     roles: Optional[list[uuid.UUID]] = None
     quiz: Optional[dict] = None
 
-class CourseProgressPublic(SQLModel):
+class CourseUserProgress(SQLModel):
     user: UserPublic
     status: StatusEnum
     attempt_count: int
     score: Optional[int]
 
-class CourseAnalyticsPublic(SQLModel):
+class CourseAnalytics(SQLModel):
     total_users: int
     completed_users: int
     failed_users: int

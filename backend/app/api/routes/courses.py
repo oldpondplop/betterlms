@@ -3,12 +3,26 @@ import uuid
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from typing import List, Any
-# from sqlalchemy import or _
-from sqlmodel import select, func, or_
+from sqlmodel import select, func, delete
 from app.api.deps import SessionDep, SuperuserRequired, CurrentUser
 from app.models import (
-    CourseAnalyticsPublic, CourseCreate, CourseMaterialPublic, CourseMaterialUpdate, CourseProgressPublic, CourseStatusEnum, CourseUpdate, Course, CoursePublic, CoursesProgressPublic, CoursesPublic, Message, QuizAttemptCreate, QuizAttemptPublic, QuizPublic, 
-    Role, RolesPublic, User, UserPublic, UsersPublic, QuizCreate, QuizUpdate, Quiz, CourseUserLink, CourseRoleLink
+    Course,
+    CourseCreate,
+    CourseMaterialPublic,
+    CourseMaterialUpdate,
+    CourseUserProgress,
+    CourseAnalytics,
+    CoursePublic,
+    CoursePublicMe,
+    CourseRoleLink,
+    CourseUpdate,
+    CourseUserLink,
+    Message,
+    Quiz,
+    QuizAttempt,
+    StatusEnum,
+    User,
+    UserPublic
 )
 from app import crud
 from app.core.config import settings
@@ -20,34 +34,43 @@ router = APIRouter(prefix="/courses", tags=["courses"])
 # COURSE MANAGEMENT
 # ================================
 
-@router.get("/me", response_model=CoursesPublic)
-def get_my_courses(session: SessionDep, current_user: CurrentUser) -> CoursesPublic:
-    stmt = (
-        select(Course)
-        .join(CourseUserLink, Course.id == CourseUserLink.course_id, isouter=True)  # type: ignore
-        .join(CourseRoleLink, Course.id == CourseRoleLink.course_id, isouter=True)  # type: ignore
-        .where(
-            or_(
-                CourseUserLink.user_id == current_user.id,  # type: ignore
-                CourseRoleLink.role_id == current_user.role_id,  # type: ignore
-            )
-        )
-        .distinct()
-    )
+@router.get("/me", response_model=List[CoursePublicMe])
+def get_my_courses(current_user: CurrentUser, session: SessionDep):
+    """Retrieve courses assigned to the current user."""
+    stmt = select(Course).join(CourseUserLink).where(CourseUserLink.user_id == current_user.id)
     courses = session.exec(stmt).all()
-    return CoursesPublic(data=list(courses), count=len(courses))
+    return courses
 
-@router.get("/", response_model=CoursesPublic, dependencies=[SuperuserRequired])
+@router.get("/", response_model=list[CoursePublic], dependencies=[SuperuserRequired])
 def get_courses(session: SessionDep, skip: int = 0, limit: int = 100):
     """Retrieve all courses with pagination."""
-    total = crud.count_courses(session)
-    data = crud.get_courses(session, skip=skip, limit=limit)
-    return CoursesPublic(data=data, count=total)
+    return crud.get_courses(session, skip=skip, limit=limit)
 
-@router.post("/", response_model=CoursePublic, dependencies=[SuperuserRequired])
+@router.post("/", response_model=CoursePublic)
 def create_course(course_in: CourseCreate, session: SessionDep):
-    """Create a new course."""
-    return crud.create_course(session, course_in)
+    course = Course(**course_in.model_dump(exclude={"users", "roles", "quiz"}))
+    session.add(course)
+    session.commit()
+    session.refresh(course)
+
+    # Assign users directly
+    for user_id in course_in.users or []:
+        session.add(CourseUserLink(course_id=course.id, user_id=user_id))
+    
+    # Assign roles and their users
+    for role_id in course_in.roles or []:
+        session.add(CourseRoleLink(course_id=course.id, role_id=role_id))
+        role_users = session.exec(select(User).where(User.role_id == role_id)).all()
+        for user in role_users:
+            session.add(CourseUserLink(course_id=course.id, user_id=user.id))
+
+    # Add quiz if provided
+    if course_in.quiz:
+        quiz = Quiz(**course_in.quiz, course_id=course.id)
+        session.add(quiz)
+    
+    session.commit()
+    return course
 
 @router.get("/{course_id}", response_model=CoursePublic)
 def get_course(course_id: uuid.UUID, session: SessionDep):
@@ -63,168 +86,66 @@ def update_course(course_id: uuid.UUID, course_in: CourseUpdate, session: Sessio
         return crud.update_course(session, db_course, course_in)
     raise HTTPException(status_code=404, detail="Course not found")
 
-@router.delete("/{course_id}", response_model=Message, dependencies=[SuperuserRequired])
+@router.delete("/{course_id}", response_model=Message)
 def delete_course(course_id: uuid.UUID, session: SessionDep):
-    """Delete a course."""
-    if db_course := session.get(Course, course_id):
-        session.delete(db_course)
-        session.commit()
-        return Message(message="Course deleted successfully")
-    raise HTTPException(status_code=404, detail="Course not found")
-
-
-# ================================
-# USER & ROLE MANAGEMENT
-# ================================
-
-@router.get("/{course_id}/roles", response_model=RolesPublic, dependencies=[SuperuserRequired])
-def get_course_roles(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve roles assigned to a course."""
-    db_course = session.get(Course, course_id)
-    if not db_course:
+    """Delete a course and unassign all users/roles."""
+    course = session.get(Course, course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    return RolesPublic(data=db_course.roles, count=len(db_course.roles))
-
-@router.post("/{course_id}/roles/{role_id}", response_model=CoursePublic, dependencies=[SuperuserRequired])
-def assign_role(course_id: uuid.UUID, role_id: uuid.UUID, session: SessionDep):
-    """Assign a role to a course."""
-    return crud.assign_role_to_course(session, course_id, role_id)
-
-@router.delete("/{course_id}/roles/{role_id}", response_model=Message, dependencies=[SuperuserRequired])
-def unassign_role(course_id: uuid.UUID, role_id: uuid.UUID, session: SessionDep):
-    """Remove a role from a course."""
-    return crud.unassign_role_from_course(session, course_id, role_id)
-
-@router.get("/{course_id}/users", response_model=UsersPublic, dependencies=[SuperuserRequired])
-def get_course_users(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve users assigned to a course."""
-    if not session.get(Course, course_id):
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    users_query = (
-        select(User)
-        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
-        .where(CourseUserLink.course_id == course_id)
-    )
-    users = session.exec(users_query).all()
-
-    total_count = session.exec(
-        select(func.count()).select_from(CourseUserLink).where(CourseUserLink.course_id == course_id)
-    ).one()
-
-    return UsersPublic(data=[UserPublic.model_validate(user) for user in users], count=total_count)
-
-@router.post("/{course_id}/users/{user_id}", response_model=CoursePublic, dependencies=[SuperuserRequired])
-def assign_user(course_id: uuid.UUID, user_id: uuid.UUID, session: SessionDep):
-    """Assign a user to a course."""
-    return crud.assign_user_to_course(session, course_id, user_id)
-
-@router.delete("/{course_id}/users/{user_id}", response_model=Message, dependencies=[SuperuserRequired])
-def unassign_user(course_id: uuid.UUID, user_id: uuid.UUID, session: SessionDep):
-    """Remove a user from a course."""
-    return crud.unassign_user_from_course(session, course_id, user_id)
-
-
-# ================================
-# QUIZ MANAGEMENT
-# ================================
-
-@router.post("/{course_id}/quiz", response_model=QuizPublic)
-def attach_quiz(course_id: uuid.UUID, quiz_in: QuizCreate, session: SessionDep):
-    existing_quiz = crud.get_quiz_by_course_id(session, course_id)
-    if existing_quiz:
-        raise HTTPException(status_code=400, detail="A quiz already exists for this course")
-
-    quiz_in.course_id = course_id
-    quiz = crud.create_quiz(session, quiz_in)
-    return quiz
-
-@router.get("/{course_id}/quiz", response_model=QuizPublic)
-def get_course_quiz(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve a quiz attached to a course."""
-    quiz = crud.get_quiz_by_course_id(session, course_id)
-    if not quiz:
-        raise HTTPException(status_code=404, detail="No quiz found for this course")
-    return quiz
-
-@router.patch("/{course_id}/quiz", response_model=QuizPublic)
-def update_course_quiz(course_id: uuid.UUID, quiz_in: QuizUpdate, session: SessionDep):
-    """Update a quiz attached to a course."""
-    quiz = crud.get_quiz_by_course_id(session, course_id)
-    if not quiz:
-        raise HTTPException(status_code=404, detail="No quiz found for this course")
-    return crud.update_quiz(session, quiz.id, quiz_in)
-
-@router.delete("/{course_id}/quiz", response_model=Message)
-def remove_course_quiz(course_id: uuid.UUID, session: SessionDep) -> Message:
-    """Remove a quiz from a course."""
-    quiz = crud.get_quiz_by_course_id(session, course_id)
-    if not quiz:
-        raise HTTPException(status_code=404, detail="No quiz found for this course")
-    session.delete(quiz)
+    
+    session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id))  # type: ignore
+    session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id))  # type: ignore
+    session.exec(delete(Quiz).where(Quiz.course_id == course_id))  # type: ignore
+    session.delete(course)
     session.commit()
-    return Message(message="Quiz deleted successfully")
+    return Message(message="Course deleted successfully")
 
+# ================================
+# COURSE ANALYTICS ENDPOINT
+# ================================
 
-@router.get("/{course_id}/progress", response_model=CoursesProgressPublic, dependencies=[SuperuserRequired])
-def get_course_progress(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve the progress of all users for a specific course."""
-    if not session.get(Course, course_id):
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    users_progress = session.exec(
-        select(User, CourseUserLink.status, CourseUserLink.attempt_count, CourseUserLink.score)
-        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
-        .where(CourseUserLink.course_id == course_id)
-    ).all()
-
-    user_data = [
-        CourseProgressPublic(
-            user=UserPublic.model_validate(user),
-            status=status,
-            attempt_count=attempt_count,
-            score=score
-        )
-        for user, status, attempt_count, score in users_progress
-    ]
-
-    return CoursesProgressPublic(data=user_data, count=len(users_progress))
-
-@router.get("/{course_id}/analytics", response_model=CourseAnalyticsPublic, dependencies=[SuperuserRequired])
+@router.get("/{course_id}/analytics", response_model=CourseAnalytics)
 def get_course_analytics(course_id: uuid.UUID, session: SessionDep):
     """Retrieve analytics for a specific course."""
     if not session.get(Course, course_id):
         raise HTTPException(status_code=404, detail="Course not found")
     
-    total_users = session.exec(
-        select(func.count()).select_from(CourseUserLink).where(CourseUserLink.course_id == course_id)
-    ).one()
+    total_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id)).one()
+    completed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.COMPLETED)).one()
+    failed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.FAILED)).one()
+    avg_attempts = session.exec(select(func.avg(CourseUserLink.attempt_count)).where(CourseUserLink.course_id == course_id)).one()
+    avg_score = session.exec(select(func.avg(CourseUserLink.score)).where(CourseUserLink.course_id == course_id, CourseUserLink.score.isnot(None))).one()  # type: ignore
     
-    completed_users = session.exec(
-        select(func.count()).select_from(CourseUserLink)
-        .where(CourseUserLink.course_id == course_id, CourseUserLink.status == CourseStatusEnum.COMPLETED)
-    ).one()
-    
-    failed_users = session.exec(
-        select(func.count()).select_from(CourseUserLink)
-        .where(CourseUserLink.course_id == course_id, CourseUserLink.status == CourseStatusEnum.FAILED)
-    ).one()
-    
-    avg_attempts = session.exec(
-        select(func.avg(CourseUserLink.attempt_count)).where(CourseUserLink.course_id == course_id)
-    ).one()
-    
-    avg_score = session.exec(
-        select(func.avg(CourseUserLink.score)).where(CourseUserLink.course_id == course_id, CourseUserLink.score.isnot(None))
-    ).one()
-    
-    return CourseAnalyticsPublic(
+    return CourseAnalytics(
         total_users=total_users,
         completed_users=completed_users,
         failed_users=failed_users,
-        average_attempts=avg_attempts or 0.0,
-        average_score=avg_score
+        average_attempts=avg_attempts or 0,
+        average_score=avg_score or 0
     )
+
+@router.get("/{course_id}/progress", response_model=List[CourseUserProgress])
+def get_course_progress(course_id: uuid.UUID, session: SessionDep):
+    """Retrieve user progress for a course."""
+    if not session.get(Course, course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    users_progress = session.exec(
+        select(User, CourseUserLink.status, CourseUserLink.attempt_count, CourseUserLink.score)
+        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
+        .where(CourseUserLink.course_id == course_id)
+    ).all()
+    
+    user_progress = session.exec(users_progress).all()
+    
+    return [
+        CourseUserProgress(
+            user=user,
+            status=status,
+            attempts=attempts or 0,
+            score=score or 0
+        ) for user, status, attempts, score in user_progress
+    ]
 
 # ================================
 # FILE UPLOADS & MATERIALS
