@@ -1,12 +1,19 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import Sequence, func
 from sqlmodel import select
 from typing import Annotated, Any, List
 from app.api.deps import SessionDep, get_current_active_superuser
 from app.models import (
-    Course, CoursesPublic, Message, Role, RoleCreate, RolePublic, RoleUpdate, 
-    RolesPublic, User, UsersPublic, CourseRoleLink
+    User,
+    UserPublic,
+    Course,
+    CoursePublic,
+    Role,
+    RolePublic,
+    RoleCreate,
+    RoleUpdate,
+    CourseRoleLink,
+    Message
 )
 
 router = APIRouter(prefix="/roles", tags=["roles"], dependencies=[Depends(get_current_active_superuser)])
@@ -49,18 +56,10 @@ def delete_role(role: RoleDep, session: SessionDep) -> Message:
     session.commit()
     return Message(message="Role deleted successfully")
 
-@router.get("/{role_id}/users", response_model=UsersPublic)
-def get_users_by_role(role: RoleDep, session: SessionDep, skip: int = 0, limit: int = 100) -> UsersPublic:
-    return UsersPublic(
-        data=session.exec(select(User).where(User.role_id == role.id).offset(skip).limit(limit)).all(),
-        count=session.exec(select(func.count()).where(User.role_id == role.id)).one()
-    )
+@router.get("/{role_id}/users", response_model=list[UserPublic])
+def get_users_by_role(role: RoleDep, session: SessionDep) -> Any:
+    return session.exec(select(User).where(User.role_id == role.id)).all()
 
-@router.get("/{role_id}/courses", response_model=CoursesPublic)
-def get_courses_by_role(role: RoleDep, session: SessionDep, skip: int = 0, limit: int = 100) -> CoursesPublic:
-    return CoursesPublic(
-        data=session.exec(
-            select(Course).join(CourseRoleLink).where(CourseRoleLink.role_id == role.id).offset(skip).limit(limit)
-        ).all(),
-        count=session.exec(select(func.count()).select_from(CourseRoleLink).where(CourseRoleLink.role_id == role.id)).one()
-    )
+@router.get("/{role_id}/courses", response_model=list[CoursePublic])
+def get_courses_by_role(role: RoleDep, session: SessionDep) -> Any:
+    return session.exec(select(Course).join(CourseRoleLink).where(CourseRoleLink.role_id == role.id)).all()
