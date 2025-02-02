@@ -46,6 +46,13 @@ def get_courses(session: SessionDep, skip: int = 0, limit: int = 100):
     """Retrieve all courses with pagination."""
     return crud.get_courses(session, skip=skip, limit=limit)
 
+@router.get("/{course_id}", response_model=CoursePublic)
+def get_course(course_id: uuid.UUID, session: SessionDep):
+    """Retrieve a specific course."""
+    if course := crud.get_course_by_id(session, course_id):
+        return course
+    raise HTTPException(status_code=404, detail="Course not found")
+
 @router.post("/", response_model=CoursePublic)
 def create_course(course_in: CourseCreate, session: SessionDep):
     course = Course(**course_in.model_dump(exclude={"users", "roles", "quiz"}))
@@ -72,19 +79,53 @@ def create_course(course_in: CourseCreate, session: SessionDep):
     session.commit()
     return course
 
-@router.get("/{course_id}", response_model=CoursePublic)
-def get_course(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve a specific course."""
-    if course := crud.get_course_by_id(session, course_id):
-        return course
-    raise HTTPException(status_code=404, detail="Course not found")
-
-@router.patch("/{course_id}", response_model=CoursePublic, dependencies=[SuperuserRequired])
+@router.patch("/{course_id}", response_model=CoursePublic)
 def update_course(course_id: uuid.UUID, course_in: CourseUpdate, session: SessionDep):
-    """Update course details."""
-    if db_course := crud.get_course_by_id(session, course_id):
-        return crud.update_course(session, db_course, course_in)
-    raise HTTPException(status_code=404, detail="Course not found")
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    course_data = course_in.model_dump(exclude_unset=True, exclude={"users", "roles", "quiz"})
+    course.sqlmodel_update(course_data)
+
+    # Handle user assignments
+    if course_in.users:
+        existing_users = {link.user_id for link in session.exec(select(CourseUserLink).where(CourseUserLink.course_id == course_id)).all()}
+        new_users = set(course_in.users)
+        users_to_add = new_users - existing_users
+        users_to_remove = existing_users - new_users
+
+        session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id, CourseUserLink.user_id.in_(users_to_remove)))
+        for user_id in users_to_add:
+            session.add(CourseUserLink(course_id=course_id, user_id=user_id))
+
+    # Handle role assignments
+    if course_in.roles:
+        existing_roles = {link.role_id for link in session.exec(select(CourseRoleLink).where(CourseRoleLink.course_id == course_id)).all()}
+        new_roles = set(course_in.roles)
+        roles_to_add = new_roles - existing_roles
+        roles_to_remove = existing_roles - new_roles
+        session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id, CourseRoleLink.role_id.in_(roles_to_remove)))
+        for role_id in roles_to_add:
+            session.add(CourseRoleLink(course_id=course_id, role_id=role_id))
+            role_users = session.exec(select(User).where(User.role_id == role_id)).all()
+            for user in role_users:
+                if not session.exec(select(CourseUserLink).where(CourseUserLink.course_id == course_id, CourseUserLink.user_id == user.id)).first():
+                    session.add(CourseUserLink(course_id=course_id, user_id=user.id))
+    
+    # Handle quiz updates
+    if course_in.quiz:
+        existing_quiz = session.exec(select(Quiz).where(Quiz.course_id == course_id)).first()
+        if existing_quiz:
+            for key, value in course_in.quiz.items():
+                setattr(existing_quiz, key, value)
+        else:
+            new_quiz = Quiz(**course_in.quiz, course_id=course_id)
+            session.add(new_quiz)
+    
+    session.commit()
+    session.refresh(course)
+    return course
 
 @router.delete("/{course_id}", response_model=Message)
 def delete_course(course_id: uuid.UUID, session: SessionDep):
@@ -136,15 +177,13 @@ def get_course_progress(course_id: uuid.UUID, session: SessionDep):
         .where(CourseUserLink.course_id == course_id)
     ).all()
     
-    user_progress = session.exec(users_progress).all()
-    
     return [
         CourseUserProgress(
             user=user,
             status=status,
-            attempts=attempts or 0,
+            attempt_count=attempts or 0,
             score=score or 0
-        ) for user, status, attempts, score in user_progress
+        ) for user, status, attempts, score in users_progress
     ]
 
 # ================================

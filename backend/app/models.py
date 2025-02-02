@@ -105,7 +105,6 @@ class User(UserBase, table=True):
 class CourseBase(SQLModel):
     title: str = Field(max_length=255)
     description: Optional[str] = Field(default=None, max_length=500)
-    materials: list[str] = Field(default_factory=list, sa_column=Column(MutableList.as_mutable(JSON())))
     is_active: bool = Field(default=True)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -135,7 +134,6 @@ class CourseMaterialPublic(SQLModel):
 class CourseUpdate(SQLModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    # materials: Optional[list[str]] = None
     is_active: Optional[bool] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -158,6 +156,7 @@ class CourseAnalytics(SQLModel):
 
 class Course(CourseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    materials: list[str] = Field(default_factory=list, sa_column=Column(MutableList.as_mutable(JSON())))
     roles: list[Role] = Relationship(back_populates="courses", link_model=CourseRoleLink)
     users: list[User] = Relationship(back_populates="courses", link_model=CourseUserLink)
     quiz: Optional["Quiz"] = Relationship(back_populates="course")
