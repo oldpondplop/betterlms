@@ -1,10 +1,11 @@
-from typing import List, Optional, Sequence
-from uuid import UUID
-from sqlmodel import SQLModel, Session, select
+from typing import Optional, Sequence
+import uuid
+from sqlmodel import Session, select, delete, func
 from fastapi import HTTPException
-from sqlalchemy import func
 
 from app.models import (
+    CourseRoleLink,
+    CourseUserLink,
     QuizAttempt,
     QuizAttemptCreate,
     UpdatePassword,
@@ -30,9 +31,6 @@ from app.core.security import get_password_hash, verify_password
 #  USER CRUD
 # ===========================
 
-def get_user_by_id(session: Session, user_id: UUID) -> Optional[User]:
-    return session.get(User, user_id)
-
 def get_user_by_email(session: Session, email: str) -> Optional[User]:
     stmt = select(User).where(User.email == email)
     return session.exec(stmt).first()
@@ -40,10 +38,6 @@ def get_user_by_email(session: Session, email: str) -> Optional[User]:
 def get_users(session: Session, skip: int = 0, limit: int = 100) -> Sequence[User]:
     stmt = select(User).offset(skip).limit(limit)
     return session.exec(stmt).all()
-
-def count_users(session: Session) -> int:
-    """Return the total number of users."""
-    return session.exec(select(func.count()).select_from(User)).one()
 
 def authenticate_user(session: Session, email: str, password: str) -> Optional[User]:
     """Check if a user with the given email/password exists."""
@@ -54,9 +48,7 @@ def authenticate_user(session: Session, email: str, password: str) -> Optional[U
 
 def create_user(session: Session, user_in: UserCreate) -> User:
     """Create a new User from a UserCreate schema."""
-    db_obj = User.model_validate(
-        user_in, update={"hashed_password": get_password_hash(user_in.password)}
-    )
+    db_obj = User.model_validate(user_in, update={"hashed_password": get_password_hash(user_in.password)})
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
@@ -76,7 +68,6 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
     user_data = user_in.model_dump(exclude_unset=True)
     if isinstance(user_in, UpdatePassword):
         user_data["hashed_password"] = get_password_hash(user_data.pop("new_password"))
-    
     db_user.sqlmodel_update(user_data)
     # session.add(db_user)
     session.commit()
@@ -88,9 +79,6 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
 #  ROLE CRUD
 # ===========================
 
-def get_role_by_id(session: Session, role_id: UUID) -> Optional[Role]:
-    return session.get(Role, role_id)
-
 def get_role_by_name(session: Session, name: str) -> Optional[Role]:
     stmt = select(Role).where(Role.name == name)
     return session.exec(stmt).first()
@@ -99,14 +87,9 @@ def get_roles(session: Session, skip: int = 0, limit: int = 100) -> Sequence[Rol
     stmt = select(Role).offset(skip).limit(limit)
     return session.exec(stmt).all()
 
-def count_roles(session: Session) -> int:
-    return session.exec(select(func.count()).select_from(Role)).one()
-
 def create_role(session: Session, role_in: RoleCreate) -> Role:
-    existing = get_role_by_name(session, role_in.name)
-    if existing:
+    if get_role_by_name(session, role_in.name):
         raise HTTPException(status_code=400, detail="Role name already exists")
-
     db_obj = Role.model_validate(role_in)
     session.add(db_obj)
     session.commit()
@@ -116,25 +99,15 @@ def create_role(session: Session, role_in: RoleCreate) -> Role:
 def update_role(session: Session, db_role: Role, role_in: RoleUpdate) -> Role:
     update_data = role_in.model_dump(exclude_unset=True)
     db_role.sqlmodel_update(update_data)
-    # session.add(db_role)
     session.commit()
     session.refresh(db_role)
     return db_role
-
-def delete_role(session: Session, role_id: UUID) -> Role:
-    db_role = get_role_by_id(session, role_id)
-    if not db_role:
-        raise HTTPException(status_code=404, detail="Role not found")
-    session.delete(db_role)
-    session.commit()
-    return db_role
-    # return Message(message="Role deleted successfully")
 
 # ===========================
 #  COURSE CRUD
 # ===========================
 
-def get_course_by_id(session: Session, course_id: UUID) -> Optional[Course]:
+def get_course_by_id(session: Session, course_id: uuid.UUID) -> Optional[Course]:
     return session.get(Course, course_id)
 
 def get_courses(session: Session, skip: int = 0, limit: int = 100) -> Sequence[Course]:
@@ -144,12 +117,45 @@ def get_courses(session: Session, skip: int = 0, limit: int = 100) -> Sequence[C
 def count_courses(session: Session) -> int:
     return session.exec(select(func.count()).select_from(Course)).one()
 
-def create_course(session: Session, course_create: CourseCreate) -> Course:
-    db_course = Course.model_validate(course_create)
-    session.add(db_course)
+def assign_users_to_course(session: Session, course_id: uuid.UUID, users: list[uuid.UUID]) -> None:
+    """Assign users to a course and handle merging."""
+    if not users: 
+        return
+    existing_users = {link.user_id for link in session.exec(select(CourseUserLink).where(CourseUserLink.course_id == course_id)).all()}
+    new_users = set(users)
+    users_to_add = new_users - existing_users
+    users_to_remove = existing_users - new_users
+    
+    session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id, CourseUserLink.user_id.in_(users_to_remove)))
+    session.add_all([CourseUserLink(course_id=course_id, user_id=user_id) for user_id in users_to_add])
+
+def assign_roles_to_course(session: Session, course_id: str, roles: list[str]) -> None:
+    """Assign roles to a course and merge existing assignments."""
+    if not roles:
+        return
+    existing_roles = {link.role_id for link in session.exec(select(CourseRoleLink).where(CourseRoleLink.course_id == course_id)).all()}
+    new_roles = set(roles)
+    roles_to_add = new_roles - existing_roles
+    roles_to_remove = existing_roles - new_roles
+    
+    session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id, CourseRoleLink.role_id.in_(roles_to_remove)))
+    session.add_all([CourseRoleLink(course_id=course_id, role_id=role_id) for role_id in roles_to_add])
+
+def create_course(session: Session, course_in: CourseCreate) -> Course:
+    course = Course(**course_in.model_dump(exclude={"users", "roles", "quiz"}))
+    session.add(course)
     session.commit()
-    session.refresh(db_course)
-    return db_course
+    session.refresh(course)
+
+    assign_users_to_course(session, course.id, course_in.users)
+    assign_roles_to_course(session, course.id, course_in.roles)
+
+    if course_in.quiz:
+        quiz = Quiz(**course_in.quiz, course_id=course.id)
+        session.add(quiz)
+    
+    session.commit()
+    return course
 
 def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
     course_data = course_in.model_dump(exclude_unset=True)
@@ -158,7 +164,7 @@ def update_course(session: Session, db_course: Course, course_in: CourseUpdate) 
     session.refresh(db_course)
     return db_course
 
-def delete_course(session: Session, course_id: UUID) -> Message:
+def delete_course(session: Session, course_id: uuid.UUID) -> Message:
     db_course = session.get(Course, course_id)
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -171,7 +177,7 @@ def delete_course(session: Session, course_id: UUID) -> Message:
 #  ROLE & USER ASSIGNMENT
 # ===========================
 
-def assign_role_to_course(session: Session, course_id: UUID, role_id: UUID) -> Course:
+def assign_role_to_course(session: Session, course_id: uuid.UUID, role_id: uuid.UUID) -> Course:
     db_course = session.get(Course, course_id)
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -187,7 +193,7 @@ def assign_role_to_course(session: Session, course_id: UUID, role_id: UUID) -> C
 
     return db_course
 
-def unassign_role_from_course(session: Session, course_id: UUID, role_id: UUID) -> Message:
+def unassign_role_from_course(session: Session, course_id: uuid.UUID, role_id: uuid.UUID) -> Message:
     db_course = session.get(Course, course_id)
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -200,7 +206,7 @@ def unassign_role_from_course(session: Session, course_id: UUID, role_id: UUID) 
     session.commit()
     return Message(message="Role unassigned successfully")
 
-def assign_user_to_course(session: Session, course_id: UUID, user_id: UUID) -> Course:
+def assign_user_to_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID) -> Course:
     db_course = session.get(Course, course_id)
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -216,7 +222,7 @@ def assign_user_to_course(session: Session, course_id: UUID, user_id: UUID) -> C
 
     return db_course
 
-def unassign_user_from_course(session: Session, course_id: UUID, user_id: UUID) -> Message:
+def unassign_user_from_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID) -> Message:
     db_course = session.get(Course, course_id)
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -234,11 +240,11 @@ def unassign_user_from_course(session: Session, course_id: UUID, user_id: UUID) 
 #  QUIZ CRUD
 # ===========================
 
-def get_quiz_by_course_id(session: Session, course_id: UUID) -> Optional[Quiz]:
+def get_quiz_by_course_id(session: Session, course_id: uuid.UUID) -> Optional[Quiz]:
     stmt = select(Quiz).where(Quiz.course_id == course_id)
     return session.exec(stmt).first()
 
-def get_quiz_by_id(session: Session, quiz_id: UUID) -> Quiz:
+def get_quiz_by_id(session: Session, quiz_id: uuid.UUID) -> Quiz:
     quiz = session.get(Quiz, quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
@@ -251,7 +257,7 @@ def create_quiz(session: Session, quiz_in: QuizCreate) -> Quiz:
     session.refresh(db_quiz)
     return db_quiz
 
-def update_quiz(session: Session, quiz_id: UUID, quiz_in: QuizUpdate) -> Quiz:
+def update_quiz(session: Session, quiz_id: uuid.UUID, quiz_in: QuizUpdate) -> Quiz:
     db_quiz = get_quiz_by_id(session, quiz_id)
     update_data = quiz_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -260,7 +266,7 @@ def update_quiz(session: Session, quiz_id: UUID, quiz_in: QuizUpdate) -> Quiz:
     session.refresh(db_quiz)
     return db_quiz
 
-def delete_quiz(session: Session, quiz_id: UUID) -> Message:
+def delete_quiz(session: Session, quiz_id: uuid.UUID) -> Message:
     db_quiz = get_quiz_by_id(session, quiz_id)
     session.delete(db_quiz)
     session.commit()

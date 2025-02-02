@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 from typing import Annotated, Any, List
 from app.api.deps import SessionDep, get_current_active_superuser
+from app import crud
 from app.models import (
     User,
     UserPublic,
@@ -35,20 +36,11 @@ def get_role(role: RoleDep) -> Any:
 
 @router.post("/", response_model=RolePublic)
 def create_role(role_in: RoleCreate, session: SessionDep) -> Any:
-    if session.exec(select(Role).where(Role.name == role_in.name)).first():
-        raise HTTPException(status_code=400, detail="A role with this name already exists.")
-    new_role = Role.model_validate(role_in)
-    session.add(new_role)
-    session.commit()
-    session.refresh(new_role)
-    return new_role
+    return crud.create_role(session, role_in)
 
 @router.patch("/{role_id}", response_model=RolePublic)
 def update_role(role: RoleDep, role_in: RoleUpdate, session: SessionDep) -> Any:
-    role.sqlmodel_update(role_in.model_dump(exclude_unset=True))
-    session.commit()
-    session.refresh(role)
-    return role
+   return crud.update_role(session, role, role_in)
 
 @router.delete("/{role_id}")
 def delete_role(role: RoleDep, session: SessionDep) -> Message:
