@@ -26,7 +26,6 @@ from app.models import (
 )
 from app.core.security import get_password_hash, verify_password
 
-
 # ===========================
 #  USER CRUD
 # ===========================
@@ -74,7 +73,6 @@ def update_user_me(session: Session, db_user: User, user_in: UserUpdateMe | Upda
     session.refresh(db_user)
     return db_user
 
-
 # ===========================
 #  ROLE CRUD
 # ===========================
@@ -114,128 +112,97 @@ def get_courses(session: Session, skip: int = 0, limit: int = 100) -> Sequence[C
     stmt = select(Course).offset(skip).limit(limit)
     return session.exec(stmt).all()
 
-def count_courses(session: Session) -> int:
-    return session.exec(select(func.count()).select_from(Course)).one()
+def get_course_users(session: Session, course_id: uuid.UUID) -> list[User]:
+    if not (db_course := session.get(Course, course_id)):
+        raise HTTPException(status_code=404, detail="Course not found")
+    return list(set(db_course.users) | {user for role in db_course.roles for user in role.users})
 
-def assign_users_to_course(session: Session, course_id: uuid.UUID, users: list[uuid.UUID]) -> None:
-    """Assign users to a course and handle merging."""
-    if not users: 
-        return
-    existing_users = {link.user_id for link in session.exec(select(CourseUserLink).where(CourseUserLink.course_id == course_id)).all()}
-    new_users = set(users)
-    users_to_add = new_users - existing_users
-    users_to_remove = existing_users - new_users
-    
-    session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id, CourseUserLink.user_id.in_(users_to_remove)))
-    session.add_all([CourseUserLink(course_id=course_id, user_id=user_id) for user_id in users_to_add])
-
-def assign_roles_to_course(session: Session, course_id: str, roles: list[str]) -> None:
-    """Assign roles to a course and merge existing assignments."""
-    if not roles:
-        return
-    existing_roles = {link.role_id for link in session.exec(select(CourseRoleLink).where(CourseRoleLink.course_id == course_id)).all()}
-    new_roles = set(roles)
-    roles_to_add = new_roles - existing_roles
-    roles_to_remove = existing_roles - new_roles
-    
-    session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id, CourseRoleLink.role_id.in_(roles_to_remove)))
-    session.add_all([CourseRoleLink(course_id=course_id, role_id=role_id) for role_id in roles_to_add])
+def get_course_roles(session: Session, course_id: uuid.UUID) -> list[Role]:
+    if not (db_course := session.get(Course, course_id)):
+        raise HTTPException(status_code=404, detail="Course not found")
+    return list(db_course.roles)
 
 def create_course(session: Session, course_in: CourseCreate) -> Course:
-    course = Course(**course_in.model_dump(exclude={"users", "roles", "quiz"}))
+    """Create a new course and handle user/role assignments."""
+    course = Course(**course_in.model_dump(exclude_unset=True, exclude={"users", "roles", "quiz"}))
     session.add(course)
     session.commit()
     session.refresh(course)
-
-    assign_users_to_course(session, course.id, course_in.users)
-    assign_roles_to_course(session, course.id, course_in.roles)
+    
+    if course_in.users or course_in.roles:
+        assign_users_and_roles(session, course.id, users_to_add=course_in.users, roles_to_add=course_in.roles)
 
     if course_in.quiz:
-        quiz = Quiz(**course_in.quiz, course_id=course.id)
-        session.add(quiz)
+        session.add(Quiz(**course_in.quiz, course_id=course.id))
     
     session.commit()
+    session.refresh(course)
     return course
 
 def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
-    course_data = course_in.model_dump(exclude_unset=True)
-    db_course.sqlmodel_update(course_data)
+    """Update course details, users, roles, and quiz assignments."""
+    course_data = course_in.model_dump(exclude_unset=True, exclude={"users_to_add", "users_to_remove", "roles_to_add", "roles_to_remove", "quiz"})
+    for key, value in course_data.items():
+        setattr(db_course, key, value)
+    
+    assign_users_and_roles(
+        session,
+        db_course.id,
+        users_to_add=course_in.users_to_add,
+        users_to_remove=course_in.users_to_remove,
+        roles_to_add=course_in.roles_to_add,
+        roles_to_remove=course_in.roles_to_remove
+    )
+
+    if course_in.quiz:
+        existing_quiz = session.exec(select(Quiz).where(Quiz.course_id == db_course.id)).first()
+        if existing_quiz:
+            for key, value in course_in.quiz.items():
+                setattr(existing_quiz, key, value)
+        else:
+            session.add(Quiz(**course_in.quiz, course_id=db_course.id))
+    
     session.commit()
     session.refresh(db_course)
     return db_course
 
-def delete_course(session: Session, course_id: uuid.UUID) -> Message:
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    session.delete(db_course)
+def assign_users_and_roles(
+    session: Session, 
+    course_id: uuid.UUID,
+    users_to_add: list[uuid.UUID] | None = None,
+    users_to_remove: list[uuid.UUID] | None = None,
+    roles_to_add: list[uuid.UUID] | None = None,
+    roles_to_remove: list[uuid.UUID] | None = None
+) -> None:
+    existing_users = {user.id for user in session.exec(select(User).join(CourseUserLink).where(CourseUserLink.course_id == course_id)).all()}
+    existing_roles = {role.id for role in session.exec(select(Role).join(CourseRoleLink).where(CourseRoleLink.course_id == course_id)).all()}
+
+    users_to_add = set(users_to_add or []) - existing_users
+    users_to_remove = set(users_to_remove or []) & existing_users
+    roles_to_add = set(roles_to_add or []) - existing_roles
+    roles_to_remove = set(roles_to_remove or []) & existing_roles
+
+    # Remove users and roles
+    if users_to_remove:
+        session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id, CourseUserLink.user_id.in_(users_to_remove)))
+    if roles_to_remove:
+        session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id, CourseRoleLink.role_id.in_(roles_to_remove)))
+
+    # Add users and roles
+    if users_to_add:
+        session.add_all([CourseUserLink(course_id=course_id, user_id=user_id) for user_id in users_to_add])
+    if roles_to_add:
+        session.add_all([CourseRoleLink(course_id=course_id, role_id=role_id) for role_id in roles_to_add])
     session.commit()
-    return Message(message="Course deleted successfully")
 
-
-# ===========================
-#  ROLE & USER ASSIGNMENT
-# ===========================
-
-def assign_role_to_course(session: Session, course_id: uuid.UUID, role_id: uuid.UUID) -> Course:
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    db_role = session.get(Role, role_id)
-    if not db_role:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    if db_role not in db_course.roles:
-        db_course.roles.append(db_role)
-        session.commit()
-        session.refresh(db_course)
-
-    return db_course
-
-def unassign_role_from_course(session: Session, course_id: uuid.UUID, role_id: uuid.UUID) -> Message:
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    db_role = session.get(Role, role_id)
-    if not db_role or db_role not in db_course.roles:
-        raise HTTPException(status_code=404, detail="Role not linked to course")
-
-    db_course.roles.remove(db_role)
+def _delete_course(session: Session, course_id: uuid.UUID) -> None:
+    """Delete a course and unassign all users/roles."""
+    session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id))
+    session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id))
+    session.exec(delete(Quiz).where(Quiz.course_id == course_id))
+    session.exec(delete(Course).where(Course.id == course_id))
     session.commit()
-    return Message(message="Role unassigned successfully")
-
-def assign_user_to_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID) -> Course:
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    db_user = session.get(User, user_id)
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if db_user not in db_course.users:
-        db_course.users.append(db_user)
-        session.commit()
-        session.refresh(db_course)
-
-    return db_course
-
-def unassign_user_from_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID) -> Message:
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    db_user = session.get(User, user_id)
-    if not db_user or db_user not in db_course.users:
-        raise HTTPException(status_code=404, detail="User not linked to course")
-
-    db_course.users.remove(db_user)
-    session.commit()
-    return Message(message="User unassigned successfully")
-
-
+    
 # ===========================
 #  QUIZ CRUD
 # ===========================

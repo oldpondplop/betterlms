@@ -14,7 +14,7 @@ fake = Faker()
 
 def create_random_course(db: Session) -> Course:
     course_in = get_random_course()
-    course = crud.create_course(session=db, course_create=course_in)
+    course = crud.create_course(session=db, course_in=course_in)
     return course
 
 def get_random_course() -> CourseCreate:
