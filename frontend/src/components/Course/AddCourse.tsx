@@ -262,7 +262,7 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
                 name="materials"
                 control={control}
                 defaultValue={[]}
-                render={({ field: { onChange, value } }) => (
+                render={({ field: { onChange} }) => (
                   <Input
                     type="file"
                     multiple

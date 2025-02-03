@@ -171,7 +171,7 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
           },
         });
   
-        // Handle materials
+        // Handle removed materials
         const removedMaterials = courseDetails?.materials?.filter(
           m => !data.existingMaterials.includes(m)
         ) || [];
@@ -185,14 +185,15 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
           )
         );
   
+        // Handle new material uploads
         if (data.materials?.length) {
-          const formData: Body_courses_upload_materials = {
-            files: data.materials, // Pass the array of files directly
+          const uploadPayload: Body_courses_upload_materials = {
+            files: data.materials, // Directly pass the File[] array
           };
   
           await CoursesService.uploadMaterials({
             courseId: course.id,
-            formData: formData, // Pass the correctly structured object
+            formData: uploadPayload, // Matches the expected type
           });
         }
   
