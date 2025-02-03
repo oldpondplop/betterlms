@@ -22,6 +22,16 @@ import type {
   CoursesAssignUserToCourseResponse,
   CoursesUnassignUserFromCourseData,
   CoursesUnassignUserFromCourseResponse,
+  CoursesUploadMaterialsData,
+  CoursesUploadMaterialsResponse,
+  CoursesUpdateMaterialsData,
+  CoursesUpdateMaterialsResponse,
+  CoursesListMaterialsData,
+  CoursesListMaterialsResponse,
+  CoursesDownloadMaterialData,
+  CoursesDownloadMaterialResponse,
+  CoursesDeleteMaterialData,
+  CoursesDeleteMaterialResponse,
   LoginLoginAccessTokenData,
   LoginLoginAccessTokenResponse,
   LoginTestTokenResponse,
@@ -299,6 +309,127 @@ export class CoursesService {
       path: {
         course_id: data.courseId,
         user_id: data.userId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Upload Materials
+   * Upload multiple files and attach them to a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.formData
+   * @returns CoursePublic Successful Response
+   * @throws ApiError
+   */
+  public static uploadMaterials(
+    data: CoursesUploadMaterialsData,
+  ): CancelablePromise<CoursesUploadMaterialsResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/courses/{course_id}/materials/",
+      path: {
+        course_id: data.courseId,
+      },
+      formData: data.formData,
+      mediaType: "multipart/form-data",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Update Materials
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.formData
+   * @returns CourseMaterialPublic Successful Response
+   * @throws ApiError
+   */
+  public static updateMaterials(
+    data: CoursesUpdateMaterialsData,
+  ): CancelablePromise<CoursesUpdateMaterialsResponse> {
+    return __request(OpenAPI, {
+      method: "PUT",
+      url: "/api/v1/courses/{course_id}/materials/",
+      path: {
+        course_id: data.courseId,
+      },
+      formData: data.formData,
+      mediaType: "multipart/form-data",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * List Materials
+   * List all materials for a course.
+   * @param data The data for the request.
+   * @param data.courseId
+   * @returns string Successful Response
+   * @throws ApiError
+   */
+  public static listMaterials(
+    data: CoursesListMaterialsData,
+  ): CancelablePromise<CoursesListMaterialsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/{course_id}/materials/",
+      path: {
+        course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Download Material
+   * Download or view a material.
+   * @param data The data for the request.
+   * @param data.filename
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static downloadMaterial(
+    data: CoursesDownloadMaterialData,
+  ): CancelablePromise<CoursesDownloadMaterialResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/materials/{filename}",
+      path: {
+        filename: data.filename,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Delete Material
+   * @param data The data for the request.
+   * @param data.courseId
+   * @param data.filename
+   * @returns Message Successful Response
+   * @throws ApiError
+   */
+  public static deleteMaterial(
+    data: CoursesDeleteMaterialData,
+  ): CancelablePromise<CoursesDeleteMaterialResponse> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/courses/{course_id}/materials/{filename}",
+      path: {
+        course_id: data.courseId,
+        filename: data.filename,
       },
       errors: {
         422: "Validation Error",

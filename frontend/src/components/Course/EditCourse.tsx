@@ -29,59 +29,64 @@ import {
   Grid,
   GridItem,
   Checkbox,
-} from "@chakra-ui/react"
-import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
-import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser } from "react-icons/fa"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { type SubmitHandler, useForm, Controller } from "react-hook-form"
-import { useState, useEffect } from "react"
+  Text,
+} from "@chakra-ui/react";
+import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons';
+import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser, FaUpload } from "react-icons/fa";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type SubmitHandler, useForm, Controller } from "react-hook-form";
+import { useState, useEffect } from "react";
 import {
   type ApiError,
+  Body_courses_upload_materials,
   type CoursePublic,
-  type CourseUpdate,
   CoursesService,
   RolesService,
   UsersService,
-} from "../../client"
-import useCustomToast from "../../hooks/useCustomToast"
-import { handleError } from "../../utils"
+} from "../../client";
+import useCustomToast from "../../hooks/useCustomToast";
+import { handleError } from "../../utils";
 
 interface EditCourseProps {
-  course: CoursePublic
-  isOpen: boolean
-  onClose: () => void
+  course: CoursePublic;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-interface FormInputs extends CourseUpdate {
-  role_ids: string[]
-  user_ids: string[] // New field for user assignments
+interface FormInputs {
+  title: string;
+  description?: string | null;
+  is_active?: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
+  role_ids: string[];
+  user_ids: string[];
+  materials: File[];
+  existingMaterials: string[];
 }
 
 const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
-  const queryClient = useQueryClient()
-  const showToast = useCustomToast()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [userSearchQuery, setUserSearchQuery] = useState("") // New state for user search
-  const [submitting, setSubmitting] = useState(false)
+  const queryClient = useQueryClient();
+  const showToast = useCustomToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch roles data
   const { data: roles } = useQuery({
     queryKey: ["roles"],
     queryFn: () => RolesService.getRoles(),
-  })
+  });
 
-  // Fetch users data
   const { data: users } = useQuery({
     queryKey: ["users"],
     queryFn: () => UsersService.getUsers(),
-  })
+  });
 
-  // Fetch current course details
   const { data: courseDetails } = useQuery({
     queryKey: ["courseDetails", course.id],
     queryFn: () => CoursesService.readCourse({ courseId: course.id }),
     enabled: isOpen,
-  })
+  });
 
   const {
     register,
@@ -95,120 +100,140 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
     defaultValues: {
       title: course.title,
       description: course.description || "",
-      materials: course.materials || [],
+      materials: [],
       is_active: course.is_active,
       start_date: course.start_date ? new Date(course.start_date).toISOString().split('T')[0] : null,
       end_date: course.end_date ? new Date(course.end_date).toISOString().split('T')[0] : null,
       role_ids: [],
-      user_ids: [], // Initialize user_ids
+      user_ids: [],
     },
-  })
+  });
 
   useEffect(() => {
     if (courseDetails) {
-      setValue('role_ids', courseDetails.roles ? courseDetails.roles.map(role => role.id) : [])
-      setValue('user_ids', courseDetails.users ? courseDetails.users.map(user => user.id) : []) // Set initial user assignments
+      setValue('role_ids', courseDetails.roles ? courseDetails.roles.map(role => role.id) : []);
+      setValue('user_ids', courseDetails.users ? courseDetails.users.map(user => user.id) : []);
     }
-  }, [courseDetails, setValue])
+  }, [courseDetails, setValue]);
 
   const handleClose = () => {
-    reset()
-    onClose()
-  }
+    reset();
+    onClose();
+  };
+
+  const handleDeleteMaterial = async (filename: string) => {
+    try {
+      await CoursesService.deleteMaterial({
+        courseId: course.id,
+        filename,
+      });
+      setValue('existingMaterials', (courseDetails?.materials ?? []).filter(f => f !== filename));
+      queryClient.invalidateQueries({ queryKey: ['courseDetails'] });
+      showToast("Success!", "Material deleted successfully.", "success");
+    } catch (error) {
+      showToast("Error", "Failed to delete material.", "error");
+    }
+  };
+
+  const handleUploadMaterial = async (files: File[]) => {
+    try {
+      // Create the form data object with the correct structure
+      const formData: Body_courses_upload_materials = {
+        files: files, // Pass the array of files directly
+      };
+  
+      // Call the uploadMaterials API
+      await CoursesService.uploadMaterials({
+        courseId: course.id,
+        formData: formData, // Pass the correctly structured object
+      });
+  
+      // Invalidate queries to refresh the course details
+      queryClient.invalidateQueries({ queryKey: ['courseDetails'] });
+      showToast('Success!', 'Material uploaded successfully.', 'success');
+    } catch (error) {
+      showToast('Error', 'Failed to upload material.', 'error');
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async (data: FormInputs) => {
-      setSubmitting(true)
+      setSubmitting(true);
       try {
         const updatedCourse = await CoursesService.updateCourse({
           courseId: course.id,
           requestBody: {
             title: data.title,
             description: data.description,
-            materials: data.materials || [],
             is_active: data.is_active,
             start_date: data.start_date ? new Date(data.start_date).toISOString().split('T')[0] : null,
             end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : null,
           },
-        })
-
-        // Handle role assignments
-        const currentRoles = courseDetails?.roles?.map(role => role.id) || []
-        const rolesToAdd = data.role_ids.filter(id => !currentRoles.includes(id))
-        for (const roleId of rolesToAdd) {
-          try {
-            await CoursesService.assignRoleToCourse({
+        });
+  
+        // Handle materials
+        const removedMaterials = courseDetails?.materials?.filter(
+          m => !data.existingMaterials.includes(m)
+        ) || [];
+  
+        await Promise.all(
+          removedMaterials.map(filename => 
+            CoursesService.deleteMaterial({
               courseId: course.id,
-              roleId: roleId,
+              filename
             })
-          } catch (error) {
-            console.error(`Failed to add role ${roleId}:`, error)
-            showToast(
-              "Warning",
-              `Failed to add role. Please try again.`,
-              `error`
-            )
-          }
+          )
+        );
+  
+        if (data.materials?.length) {
+          const formData: Body_courses_upload_materials = {
+            files: data.materials, // Pass the array of files directly
+          };
+  
+          await CoursesService.uploadMaterials({
+            courseId: course.id,
+            formData: formData, // Pass the correctly structured object
+          });
         }
-
-        // Handle user assignments
-        const currentUsers = courseDetails?.users?.map(user => user.id) || []
-        const usersToAdd = data.user_ids.filter(id => !currentUsers.includes(id))
-        for (const userId of usersToAdd) {
-          try {
-            await CoursesService.assignUserToCourse({
-              courseId: course.id,
-              userId: userId,
-            })
-          } catch (error) {
-            console.error(`Failed to add user ${userId}:`, error)
-            showToast(
-              "Warning",
-              `Failed to add user. Please try again.`,
-              "error"
-            )
-          }
-        }
-
-        return updatedCourse
+  
+        return updatedCourse;
       } finally {
-        setSubmitting(false)
+        setSubmitting(false);
       }
     },
     onSuccess: () => {
-      showToast("Success!", "Course updated successfully.", "success")
-      queryClient.invalidateQueries({ queryKey: ["courses"] })
-      queryClient.invalidateQueries({ queryKey: ["courseDetails"] })
-      handleClose()
+      showToast("Success!", "Course updated successfully.", "success");
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["courseDetails"] });
+      handleClose();
     },
     onError: (err: ApiError) => {
-      handleError(err, showToast)
+      handleError(err, showToast);
     },
     onSettled: () => {
-      // Invalidate all relevant queries
-      queryClient.invalidateQueries({ queryKey: ["users"] })
+      queryClient.invalidateQueries({ queryKey: ["users"] });
       if (users) {
         users?.data.forEach(user => {
-          queryClient.invalidateQueries({ queryKey: ["userDetails", user.id] })
-        })
+          queryClient.invalidateQueries({ queryKey: ["userDetails", user.id] });
+        });
       }
-      queryClient.invalidateQueries({ queryKey: ["roles"] })
-      queryClient.invalidateQueries({ queryKey: ["courses"] })  // Add this
-      queryClient.invalidateQueries({ queryKey: ["courseDetails"] })  // Add this if not already present
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["courseDetails"] });
     },
-  })
+  });
 
   const onSubmit: SubmitHandler<FormInputs> = async (data) => {
-    mutation.mutate(data)
-  }
+    mutation.mutate(data);
+  };
 
   const filteredRoles = roles?.data?.filter(role => 
     role.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || []
+  ) || [];
 
   const filteredUsers = users?.data?.filter(user => 
     user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
-  ) || []
+  ) || [];
 
   return (
     <Modal 
@@ -290,7 +315,43 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
                 </FormControl>
               </GridItem>
             </Grid>
-
+            <FormControl>
+              <FormLabel>
+                <Icon as={FaUpload} mr={2} />
+                Materials
+              </FormLabel>
+              <VStack align="stretch" spacing={3}>
+                {courseDetails?.materials?.map((filename) => (
+                  <Flex key={filename} justify="space-between" align="center">
+                    <Text>{filename}</Text>
+                    <Button
+                      size="sm"
+                      colorScheme="red"
+                      onClick={() => handleDeleteMaterial(filename)}
+                    >
+                      Delete
+                    </Button>
+                  </Flex>
+                ))}
+                <Controller
+                  name="materials"
+                  control={control}
+                  defaultValue={[]}
+                  render={({ field: { onChange } }) => (
+                    <Input
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        onChange(files);
+                        handleUploadMaterial(files);
+                      }}
+                    />
+                  )}
+                />
+              </VStack>
+            </FormControl>
             <FormControl>
               <FormLabel>
                 <Icon as={FaUserTag} mr={2} />
@@ -421,7 +482,6 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
               />
             </FormControl>
 
-            {/* New Section: Assign to Users */}
             <FormControl>
               <FormLabel>
                 <Icon as={FaUser} mr={2} />
@@ -577,7 +637,7 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
         </ModalFooter>
       </ModalContent>
     </Modal>
-  )
-}
+  );
+};
 
-export default EditCourse
+export default EditCourse;

@@ -85,7 +85,7 @@ function CourseRow({ course }: { course: CourseDetailed }) {
   const queryClient = useQueryClient()
   const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
   const { data: courseDetails } = useQuery(getCourseDetailsQueryOptions(course.id))
-  
+  const materials = courseDetails?.materials || course.materials || []
   const rolesCount = courseDetails?.roles?.length || course.roles?.length || 0
   const usersCount = courseDetails?.users?.length || course.users?.length || 0
 
@@ -104,7 +104,7 @@ function CourseRow({ course }: { course: CourseDetailed }) {
             h="2"
             borderRadius="50%"
             bg={course.is_active ? "ui.success" : "ui.danger"}
-            alignSelf="center"
+            alignSelf="center"  
           />
           {course.is_active ? "Active" : "Inactive"}
         </Flex>
@@ -115,6 +115,11 @@ function CourseRow({ course }: { course: CourseDetailed }) {
         ) : (
           <Badge colorScheme="gray">No Quiz</Badge>
         )}
+      </Td>
+      <Td>
+        <Badge colorScheme={materials.length>0 ? "green" : "gray"}>
+          {materials.length>0 ? "Yes" : "No"}
+        </Badge>
       </Td>
       <Td>
         <RolesBadge count={rolesCount} />
@@ -131,7 +136,7 @@ function CourseRow({ course }: { course: CourseDetailed }) {
       </Td>
     </Tr>
   )
-}
+ }
 
 function CoursesTable() {
   const queryClient = useQueryClient()
@@ -177,6 +182,7 @@ function CoursesTable() {
               <Th width="30%">Description</Th>
               <Th width="10%">Status</Th>
               <Th width="10%">Quiz</Th>
+              <Th width="10%">Materials</Th>
               <Th width="10%">Roles</Th>
               <Th width="10%">Users</Th>
               <Th width="10%">Actions</Th>

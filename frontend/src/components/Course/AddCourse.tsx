@@ -26,46 +26,53 @@ import {
   GridItem,
   Checkbox,
   Text,
-} from "@chakra-ui/react"
-import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
-import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser } from "react-icons/fa"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { type SubmitHandler, useForm, Controller } from "react-hook-form"
-import { useState } from "react"
+} from "@chakra-ui/react";
+import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons';
+import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser, FaUpload } from "react-icons/fa";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type SubmitHandler, useForm, Controller } from "react-hook-form";
+import { useState } from "react";
 import { 
   type CourseCreate, 
   CoursesService,
   RolesService,
   UsersService,
-} from "../../client"
-import useCustomToast from "../../hooks/useCustomToast"
+  type Body_courses_upload_materials,
+} from "../../client";
+import useCustomToast from "../../hooks/useCustomToast";
 
 interface AddCourseProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-interface FormInputs extends CourseCreate {
-  role_ids: string[]
-  user_ids: string[]
+interface FormInputs {
+  title: string;
+  description?: string | null;
+  materials?: File[];
+  is_active?: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
+  role_ids: string[];
+  user_ids: string[];
 }
 
 const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
-  const queryClient = useQueryClient()
-  const showToast = useCustomToast()
-  const [roleSearchQuery, setRoleSearchQuery] = useState("")
-  const [userSearchQuery, setUserSearchQuery] = useState("")
-  const [submitting, setSubmitting] = useState(false)
+  const queryClient = useQueryClient();
+  const showToast = useCustomToast();
+  const [roleSearchQuery, setRoleSearchQuery] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const { data: roles } = useQuery({
     queryKey: ["roles"],
     queryFn: () => RolesService.getRoles(),
-  })
+  });
 
   const { data: users } = useQuery({
     queryKey: ["users"],
     queryFn: () => UsersService.getUsers(),
-  })
+  });
 
   const {
     register,
@@ -85,79 +92,86 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
       role_ids: [],
       user_ids: [],
     },
-  })
+  });
 
   const handleClose = () => {
-    reset()
-    onClose()
-  }
+    reset();
+    onClose();
+  };
 
   // Filter roles based on search
   const filteredRoles = roles?.data?.filter(role => 
     role.name.toLowerCase().includes(roleSearchQuery.toLowerCase())
-  ) || []
+  ) || [];
 
   // Filter users based on search
   const filteredUsers = users?.data?.filter(user => 
     user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(userSearchQuery.toLowerCase())
-  ) || []
-
-  const mutation = useMutation({
-    mutationFn: async (data: FormInputs) => {
-      setSubmitting(true)
-      try {
-        const course = await CoursesService.createCourse({ 
-          requestBody: {
-            title: data.title,
-            description: data.description,
-            materials: data.materials || [],
-            is_active: data.is_active,
-            start_date: data.start_date ? new Date(data.start_date).toISOString().split('T')[0] : null,
-            end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : null,
-          }
-        })
-
-        if (data.role_ids?.length > 0) {
-          for (const roleId of data.role_ids) {
-            await CoursesService.assignRoleToCourse({
-              courseId: course.id,
-              roleId: roleId,
-            })
-          }
-        }
-
-        if (data.user_ids?.length > 0) {
-          for (const userId of data.user_ids) {
-            await CoursesService.assignUserToCourse({
-              courseId: course.id,
-              userId: userId,
-            })
-          }
-        }
-
-        return course
-      } finally {
-        setSubmitting(false)
-      }
-    },
-    onSuccess: () => {
-      showToast("Success!", "Course created successfully.", "success")
-      queryClient.invalidateQueries({ queryKey: ["courses"] })
-      handleClose()
-    },
-    onError: (error) => {
-      showToast(
-        "Error",
-        error instanceof Error ? error.message : "Failed to create course",
-        "error"
-      )
-    },
-  })
+  ) || [];
 
   const onSubmit: SubmitHandler<FormInputs> = async (data) => {
-    mutation.mutate(data)
-  }
+    try {
+      setSubmitting(true);
+
+      // Step 1: Create the course
+      const course = await CoursesService.createCourse({
+        requestBody: {
+          title: data.title,
+          description: data.description,
+          is_active: data.is_active,
+          start_date: data.start_date ? new Date(data.start_date).toISOString().split('T')[0] : null,
+          end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : null,
+        },
+      });
+
+      // Step 2: Upload materials
+      if (data.materials?.length) {
+        // Create an object that matches the expected type
+        const body: Body_courses_upload_materials = {
+          files: data.materials, // Pass the array of files directly
+        };
+
+        const updatedCourse = await CoursesService.uploadMaterials({
+          courseId: course.id,
+          formData: body, // Pass the correctly structured object
+        });
+
+        console.log("Materials uploaded:", updatedCourse);
+      }
+
+      // Step 3: Assign roles and users (if any)
+      if (data.role_ids?.length) {
+        await Promise.all(
+          data.role_ids.map((roleId) =>
+            CoursesService.assignRoleToCourse({
+              courseId: course.id,
+              roleId,
+            })
+          )
+        );
+      }
+
+      if (data.user_ids?.length) {
+        await Promise.all(
+          data.user_ids.map((userId) =>
+            CoursesService.assignUserToCourse({
+              courseId: course.id,
+              userId,
+            })
+          )
+        );
+      }
+
+      showToast('Success!', 'Course created successfully.', 'success');
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+      handleClose();
+    } catch (error) {
+      showToast('Error', error instanceof Error ? error.message : 'Failed to create course', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Modal 
@@ -239,7 +253,28 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
                 </FormControl>
               </GridItem>
             </Grid>
-
+            <FormControl>
+              <FormLabel>
+                <Icon as={FaUpload} mr={2} />
+                Materials
+              </FormLabel>
+              <Controller
+                name="materials"
+                control={control}
+                defaultValue={[]}
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      onChange(files);
+                    }}
+                  />
+                )}
+              />
+            </FormControl>
             <FormControl>
               <FormLabel>
                 <Icon as={FaUserTag} mr={2} />
@@ -287,8 +322,8 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
                               onClick={() => {
                                 const newValue = value.includes(role.id)
                                   ? value.filter(id => id !== role.id)
-                                  : [...value, role.id]
-                                onChange(newValue)
+                                  : [...value, role.id];
+                                onChange(newValue);
                               }}
                             >
                               <Checkbox 
@@ -354,8 +389,8 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
                               onClick={() => {
                                 const newValue = value.includes(user.id)
                                   ? value.filter(id => id !== user.id)
-                                  : [...value, user.id]
-                                onChange(newValue)
+                                  : [...value, user.id];
+                                onChange(newValue);
                               }}
                             >
                               <Checkbox 
@@ -400,7 +435,7 @@ const AddCourse = ({ isOpen, onClose }: AddCourseProps) => {
         </ModalFooter>
       </ModalContent>
     </Modal>
-  )
-}
+  );
+};
 
-export default AddCourse
+export default AddCourse;

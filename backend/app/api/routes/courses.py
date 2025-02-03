@@ -1,16 +1,19 @@
+import shutil
 from uuid import UUID
 from typing import Any, List
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, select
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
-from sqlmodel import Session
+from sqlmodel import Session, delete, select
 
 from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser, SuperuserRequired
 from app.models import (
     Course,
     CourseCreate,
+    CourseMaterialPublic,
+    CourseMaterialUpdate,
     CoursePublic,
     CourseRoleLink,
     CourseUpdate,
@@ -27,6 +30,7 @@ from app.models import (
     User,
 )
 from app import crud
+from app.core.config import settings
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -274,3 +278,89 @@ def unassign_user_from_course(course_id: UUID, user_id: UUID, session: SessionDe
     session.commit()
     session.refresh(db_course)
     return Message(message="User removed from course successfully")
+
+# ================================
+# FILE UPLOADS & MATERIALS
+# ================================
+
+@router.post("/{course_id}/materials/", response_model=CoursePublic, dependencies=[SuperuserRequired])
+def upload_materials(course_id: uuid.UUID, session: SessionDep, files: List[UploadFile] = File(...)):
+    """Upload multiple files and attach them to a course."""
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    for file in files:
+        new_file_path = settings.UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}"
+        with new_file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        db_course.materials.append(new_file_path.name)
+
+    session.commit()
+    session.refresh(db_course)
+    return db_course
+
+@router.put("/{course_id}/materials/", response_model=CourseMaterialPublic)
+def update_materials(course_id: uuid.UUID,
+    session: SessionDep,
+    materials_update: CourseMaterialUpdate,  
+    files: List[UploadFile] = File([])
+):
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Remove
+    for filename in materials_update.remove_files:
+        if filename not in db_course.materials:
+            raise HTTPException(status_code=400, detail=f"Material '{filename}' not found")
+        file_path = settings.UPLOAD_DIR / filename
+        if file_path.exists():
+            file_path.unlink()
+        db_course.materials.remove(filename)
+
+    # Upload
+    for file in files:
+        new_file_path = settings.UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}"
+        with new_file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        db_course.materials.append(new_file_path.name)
+
+    session.commit()
+    session.refresh(db_course)
+    
+    return CourseMaterialPublic(course_id=course_id, materials=db_course.materials)
+
+@router.get("/{course_id}/materials/", response_model=List[str])
+def list_materials(course_id: uuid.UUID, session: SessionDep):
+    """List all materials for a course."""
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return db_course.materials
+
+@router.get("/materials/{filename}")
+def download_material(filename: str):
+    """Download or view a material."""
+    file_path = settings.UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path, media_type="application/pdf", filename=filename)
+
+@router.delete("/{course_id}/materials/{filename}", response_model=Message, dependencies=[SuperuserRequired])
+def delete_material(session: SessionDep, course_id: uuid.UUID, filename: str) -> Any:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if filename not in db_course.materials:
+        raise HTTPException(status_code=404, detail="Material not found in this course")
+    
+    db_course.materials.remove(filename)
+    session.add(db_course)
+    session.commit()
+    session.refresh(db_course)
+
+    file_path = settings.UPLOAD_DIR / filename
+    if file_path.exists():
+        file_path.unlink()
+    return Message(message="Course material deleted sucessfuly.")

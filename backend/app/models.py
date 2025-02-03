@@ -5,6 +5,7 @@ from enum import Enum
 from pydantic import EmailStr
 from sqlalchemy import ForeignKey
 from sqlmodel import Field, Relationship, SQLModel, Column, JSON, func
+from sqlalchemy.ext.mutable import MutableList
 
 
 # =========================================================
@@ -140,7 +141,6 @@ class User(UserBase, table=True):
 class CourseBase(SQLModel):
     title: str = Field(max_length=255)
     description: Optional[str] = Field(default=None, max_length=500)
-    materials: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     is_active: bool = Field(default=True)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -170,10 +170,11 @@ class CourseDetailed(CoursePublic):
     roles: List[RolePublic] = []
     users: List[UserPublic] = []
     quiz: Optional['QuizPublic'] = None
+    materials: list[str] = []
 
 class Course(CourseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
+    materials: list[str] = Field(default_factory=list, sa_column=Column(MutableList.as_mutable(JSON())))
     # Many-to-many with Roles
     roles: List[Role] = Relationship(back_populates="courses", link_model=CourseRoleLink)
     # Many-to-many with Users
@@ -192,7 +193,13 @@ class Course(CourseBase, table=True):
             "onupdate": lambda: datetime.now(timezone.utc),
         },
     )
+class CourseMaterialUpdate(SQLModel):
+    remove_files: List[str] = []
+    new_files: List[str] = []
 
+class CourseMaterialPublic(SQLModel):
+    course_id: uuid.UUID
+    materials: List[str]
 # ================================
 # QUIZ MODELS
 # ================================
