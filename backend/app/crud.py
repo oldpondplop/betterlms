@@ -177,9 +177,18 @@ def assign_users_and_roles(
     existing_users = {user.id for user in session.exec(select(User).join(CourseUserLink).where(CourseUserLink.course_id == course_id)).all()}
     existing_roles = {role.id for role in session.exec(select(Role).join(CourseRoleLink).where(CourseRoleLink.course_id == course_id)).all()}
 
-    users_to_add = set(users_to_add or []) - existing_users
+    # Validate users and roles exist before adding
+    valid_users = {user.id for user in session.exec(select(User).where(User.id.in_(users_to_add or []))).all()}
+    valid_roles = {role.id for role in session.exec(select(Role).where(Role.id.in_(roles_to_add or []))).all()}
+
+    # Remove invalid users and roles
+    users_to_add = set(users_to_add or []) & valid_users
+    roles_to_add = set(roles_to_add or []) & valid_roles
+
+    # Identify users/roles to add and remove
+    users_to_add = users_to_add - existing_users
     users_to_remove = set(users_to_remove or []) & existing_users
-    roles_to_add = set(roles_to_add or []) - existing_roles
+    roles_to_add = roles_to_add - existing_roles
     roles_to_remove = set(roles_to_remove or []) & existing_roles
 
     # Remove users and roles
@@ -193,6 +202,7 @@ def assign_users_and_roles(
         session.add_all([CourseUserLink(course_id=course_id, user_id=user_id) for user_id in users_to_add])
     if roles_to_add:
         session.add_all([CourseRoleLink(course_id=course_id, role_id=role_id) for role_id in roles_to_add])
+
     session.commit()
 
 def _delete_course(session: Session, course_id: uuid.UUID) -> None:

@@ -3,13 +3,12 @@ import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from typing import List, Any
+from sqlalchemy import or_
 from sqlmodel import select, func
 from app.api.deps import SessionDep, SuperuserRequired, CurrentUser
 from app.models import (
     Course,
     CourseCreate,
-    CourseMaterialPublic,
-    CourseMaterialUpdate,
     CourseUserProgress,
     CourseAnalytics,
     CoursePublic,
@@ -18,73 +17,34 @@ from app.models import (
     CourseUpdate,
     CourseUserLink,
     Message,
-    Quiz,
-    QuizAttempt,
     StatusEnum,
     User,
-    UserPublic
 )
 from app import crud
 from app.core.config import settings
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
-
-"""
-me:
-26dc9d4d-23e3-4d41-872b-325fd3d75215
-
-infirmiera:
-a8efdf0f-e6e9-4600-b2e4-5c2335377ae3
-assistent medical:
-87d6edaa-ccbe-49f5-8748-ade80432d8f8
- {
-    "name": "Jessica Austin",
-    "email": "caldwellmatthew@example.org",
-    "id": "b5661d36-96c2-4f71-9536-f98dc3dfef8c",
-    "role_id": "625a60c8-7a2f-47cd-81a8-82932a23ed2e"
-  },
- {
-    "name": "Elizabeth Brown",
-    "email": "chandlerbrian@example.net",
-    "id": "336241ba-7ffa-4293-a39f-0cb84beada6e",  -> assigned to course ae90cd44-d808-4cec-8b9f-a6774668015f
-    "role_id": "625a60c8-7a2f-47cd-81a8-82932a23ed2e"
-  },
-courses:
-{
-"title": "Chair call person.",
-"description": "They onto model writer who month past somebody.\nAffect once laugh student local. To personal those try seven. Smile behavior staff because.",
-"is_active": true,
-"start_date": "2025-01-07",
-"end_date": "2025-01-11",
-"id": "ae90cd44-d808-4cec-8b9f-a6774668015f",
-"users": [],
-"roles": [],
-"quiz": null
-},
-{
-"title": "Experience.",
-"description": "Majority start ago check pay or against. Something help only project moment table.",
-"is_active": true,
-"start_date": "2025-01-05",
-"end_date": "2025-01-07",
-"id": "5607d832-2ec9-44d9-a4d7-a0cbe5bd80e0",
-"users": [],
-"roles": [],
-"quiz": null
-},
-"""
-
 # ================================
 # COURSE MANAGEMENT
 # ================================
 
-@router.get("/me", response_model=List[CoursePublicMe])
-def get_my_courses(current_user: CurrentUser, session: SessionDep):
-    """Retrieve courses assigned to the current user."""
-    stmt = select(Course).join(CourseUserLink).where(CourseUserLink.user_id == current_user.id)
+@router.get("/me", response_model=list[CoursePublicMe])
+def get_my_courses(session: SessionDep, current_user: CurrentUser):
+    stmt = (
+        select(Course)
+        .join(CourseUserLink, Course.id == CourseUserLink.course_id, isouter=True)  # type: ignore
+        .join(CourseRoleLink, Course.id == CourseRoleLink.course_id, isouter=True)  # type: ignore
+        .where(
+            or_(
+                CourseUserLink.user_id == current_user.id,  # type: ignore
+                CourseRoleLink.role_id == current_user.role_id,  # type: ignore
+            )
+        )
+        .distinct()
+    )
     courses = session.exec(stmt).all()
-    return courses
+    return list(courses)
 
 @router.get("/", response_model=list[CoursePublic], dependencies=[SuperuserRequired])
 def get_courses(session: SessionDep, skip: int = 0, limit: int = 100):
