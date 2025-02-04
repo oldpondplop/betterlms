@@ -60,7 +60,7 @@ class Role(RoleBase, table=True):
 # ================================
 
 class UserBase(SQLModel):
-    name: str
+    name: Optional[str] = None
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = True
     is_superuser: bool = False
@@ -68,7 +68,7 @@ class UserBase(SQLModel):
 
 class UserCreate(UserBase):
     password: str
-    role_id: Optional[uuid.UUID]
+    role_id: Optional[uuid.UUID] = None
 
 class UserPublic(UserBase):
     id: uuid.UUID
