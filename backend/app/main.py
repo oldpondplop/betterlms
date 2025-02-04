@@ -23,9 +23,9 @@ if settings.all_cors_origins:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-print(app.openapi_url)
+
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-@app.middleware("http")
-async def log_middleware(request: Request, call_next):
-    return await log_request(request, call_next)
+# @app.middleware("http")
+# async def log_middleware(request: Request, call_next):
+#     return await log_request(request, call_next)
