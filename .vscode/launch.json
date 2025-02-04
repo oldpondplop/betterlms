@@ -25,5 +25,24 @@
             "url": "http://localhost:5173",
             "webRoot": "${workspaceFolder}/frontend"
         },
+        {
+            "name": "Debug Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-vvv",
+                "-s",
+                "--tb=short",
+                "--disable-warnings",
+                "--cache-clear",
+                "--maxfail=1",
+                "${file}"
+            ],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/.venv/bin/python",
+            "envFile": "${workspaceFolder}/backend/.env",
+            "console": "integratedTerminal"
+        }
     ]
 }
