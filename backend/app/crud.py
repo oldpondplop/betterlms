@@ -1,13 +1,17 @@
+import shutil
 from typing import Optional, Sequence
 import uuid
 from sqlmodel import Session, select, delete, func
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 
 from app.models import (
+    CourseAnalytics,
     CourseRoleLink,
     CourseUserLink,
+    CourseUserProgress,
     QuizAttempt,
     QuizAttemptCreate,
+    StatusEnum,
     UpdatePassword,
     User,
     UserCreate,
@@ -25,6 +29,7 @@ from app.models import (
     UserUpdateMe
 )
 from app.core.security import get_password_hash, verify_password
+from app.core.config import settings
 
 # ===========================
 #  USER CRUD
@@ -126,6 +131,7 @@ def create_course(session: Session, course_in: CourseCreate) -> Course:
     """Create a new course and handle user/role assignments."""
     course = Course(**course_in.model_dump(exclude_unset=True, exclude={"users", "roles", "quiz"}))
     session.add(course)
+    # session.flush()
     session.commit()
     session.refresh(course)
     
@@ -166,6 +172,70 @@ def update_course(session: Session, db_course: Course, course_in: CourseUpdate) 
     session.refresh(db_course)
     return db_course
 
+# NOTE: same as assign but orm.
+def orm_assign_users_and_roles(
+    session: Session, 
+    course_id: uuid.UUID,
+    users_to_add: list[uuid.UUID] | None = None,
+    users_to_remove: list[uuid.UUID] | None = None,
+    roles_to_add: list[uuid.UUID] | None = None,
+    roles_to_remove: list[uuid.UUID] | None = None
+) -> None:
+    """Assign users and roles to a course while maintaining explicit user assignments."""
+
+    # Get course object (ORM)
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Current users and roles in the course
+    existing_users = {user.id for user in course.users}
+    existing_roles = {role.id for role in course.roles}
+
+    # Validate users & roles exist before adding
+    valid_users = {user.id for user in session.exec(select(User).where(User.id.in_(users_to_add or []))).all()}
+    valid_roles = {role.id for role in session.exec(select(Role).where(Role.id.in_(roles_to_add or []))).all()}
+
+    # Remove invalid IDs (safety check)
+    users_to_add = set(users_to_add or []) & valid_users
+    roles_to_add = set(roles_to_add or []) & valid_roles
+    users_to_remove = set(users_to_remove or []) & existing_users
+    roles_to_remove = set(roles_to_remove or []) & existing_roles
+
+    # 📌 Assign users explicitly
+    for user_id in users_to_add - existing_users:
+        user = session.get(User, user_id)
+        if user:
+            course.users.append(user)
+
+    for user_id in users_to_remove:
+        user = session.get(User, user_id)
+        if user and user in course.users:
+            course.users.remove(user)
+
+    # 📌 Assign roles
+    for role_id in roles_to_add - existing_roles:
+        role = session.get(Role, role_id)
+        if role:
+            course.roles.append(role)
+            # Add users from this role explicitly
+            # for user in role.users:
+            #     if user.id not in existing_users:
+            #         course.users.append(user)
+
+    for role_id in roles_to_remove:
+        role = session.get(Role, role_id)
+        if role and role in course.roles:
+            course.roles.remove(role)
+            # Remove users from this role (if they were assigned only via this role)
+            # for user in role.users:
+            #     if not any(user in other_role.users for other_role in course.roles):
+            #         if user in course.users:
+            #             course.users.remove(user)
+
+    session.commit()
+    session.refresh(course)
+
 def assign_users_and_roles(
     session: Session, 
     course_id: uuid.UUID,
@@ -205,14 +275,64 @@ def assign_users_and_roles(
 
     session.commit()
 
-def _delete_course(session: Session, course_id: uuid.UUID) -> None:
-    """Delete a course and unassign all users/roles."""
-    session.exec(delete(CourseUserLink).where(CourseUserLink.course_id == course_id))
-    session.exec(delete(CourseRoleLink).where(CourseRoleLink.course_id == course_id))
-    session.exec(delete(Quiz).where(Quiz.course_id == course_id))
-    session.exec(delete(Course).where(Course.id == course_id))
+def upload_course_materials(session: Session, course_id: uuid.UUID, files: list[UploadFile]) -> Course:
+    """Upload multiple materials to a course."""
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    for file in files:
+        file_path = settings.UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}"
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        db_course.materials.append(file_path.name)
+
     session.commit()
+    session.refresh(db_course)
+    return db_course
+
+
+def list_course_materials(session: Session, course_id: uuid.UUID) -> list[str]:
+    """List all materials attached to a course."""
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return db_course.materials
+
+def delete_course_material(session: Session, course_id: uuid.UUID, filename: str) -> Message:
+    """Delete a specific material from a course."""
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if filename not in db_course.materials:
+        raise HTTPException(status_code=404, detail="Material not found in this course")
     
+    db_course.materials.remove(filename)
+    session.add(db_course)
+    session.commit()
+    session.refresh(db_course)
+
+    file_path = settings.UPLOAD_DIR / filename
+    if file_path.exists():
+        file_path.unlink()
+    return Message(message="Course material deleted successfully.")
+
+def delete_all_course_materials(session: Session, course_id: uuid.UUID) -> Message:
+    """Delete all materials for a course."""
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    for filename in db_course.materials:
+        file_path = settings.UPLOAD_DIR / filename
+        if file_path.exists():
+            file_path.unlink()
+
+    db_course.materials = []
+    session.commit()
+    return Message(message="All course materials deleted successfully.")
+
+
 # ===========================
 #  QUIZ CRUD
 # ===========================
@@ -271,3 +391,43 @@ def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> Quiz
     session.commit()
     session.refresh(quiz_attempt)
     return quiz_attempt
+
+def get_course_analytics(session: Session, course_id: uuid.UUID) -> CourseAnalytics:
+    if not session.get(Course, course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    total_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id)).one()
+    completed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.COMPLETED)).one()
+    failed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.FAILED)).one()
+    avg_attempts = session.exec(select(func.avg(CourseUserLink.attempt_count)).where(CourseUserLink.course_id == course_id)).one()
+    avg_score = session.exec(select(func.avg(CourseUserLink.score)).where(CourseUserLink.course_id == course_id, CourseUserLink.score.isnot(None))).one()  # type: ignore
+    
+    return CourseAnalytics(
+        total_users=total_users,
+        completed_users=completed_users,
+        failed_users=failed_users,
+        average_attempts=avg_attempts or 0,
+        average_score=avg_score or 0
+    )
+
+def get_course_progress(session: Session, course_id: uuid.UUID) -> list[CourseUserProgress]:
+    """Retrieve user progress for a course."""
+    if not session.get(Course, course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    users_progress = session.exec(
+        select(User, CourseUserLink.status, CourseUserLink.attempt_count, CourseUserLink.score)
+        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
+        .where(CourseUserLink.course_id == course_id)
+    ).all()
+    
+    return [
+        CourseUserProgress(
+            user=user,
+            status=status,
+            attempt_count=attempts or 0,
+            score=score or 0
+        ) for user, status, attempts, score in users_progress
+    ]
+
+

@@ -49,7 +49,6 @@ def get_my_courses(session: SessionDep, current_user: CurrentUser):
 @router.get("/", response_model=list[CoursePublic], dependencies=[SuperuserRequired])
 def get_courses(session: SessionDep, skip: int = 0, limit: int = 100):
     courses = crud.get_courses(session, skip=skip, limit=limit)
-    print(courses)
     return courses
 
 @router.post("/", response_model=CoursePublic)

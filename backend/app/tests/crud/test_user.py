@@ -1,5 +1,4 @@
-import uuid
-from app.tests.utils.user import create_random_user, get_random_employee
+from app.tests.utils.user import get_random_employee
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 import pytest
@@ -7,7 +6,7 @@ from sqlmodel import Session, select
 
 from app import crud
 from app.core.security import get_password_hash, verify_password
-from app.models import UpdatePassword, User, UserCreate, UserUpdate, UserUpdateMe
+from app.models import UpdatePassword, User, UserCreate, UserUpdateMe
 from app.tests.utils.utils import random_email, random_lower_string, random_name, random_role
 
 
@@ -157,7 +156,6 @@ def test_create_user_duplicate_email(db: Session) -> None:
     """Test that creating a user with an existing email fails."""
     user_in = get_random_employee(db)
     user1 = crud.create_user(session=db, user_in=user_in)
-    print(user1)
     user_in.user_id = "EMP9999"
 
     with pytest.raises(Exception):

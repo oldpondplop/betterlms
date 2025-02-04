@@ -13,8 +13,7 @@ def init_db(session: Session| None = None) -> None:
     """Initialize the database."""
     if session is None:  
         session = Session(engine)  
-
-    SQLModel.metadata.create_all(engine)
+        SQLModel.metadata.create_all(engine)
 
     admin = session.exec(select(User).where(User.email == settings.FIRST_SUPERUSER)).first()
     if not admin:
