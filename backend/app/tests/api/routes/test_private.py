@@ -1,6 +1,6 @@
-from app import crud
+import uuid
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.core.config import settings
 from app.models import User
@@ -19,7 +19,7 @@ def test_create_user(client: TestClient, db: Session) -> None:
     assert r.status_code == 200
 
     data = r.json()
-    user = crud.get_by_uuid(db, User, data["id"])
+    user = db.get(User, uuid.UUID(data["id"]))
 
     assert user
     assert user.email == "pollo@listo.com"
