@@ -137,18 +137,13 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
 
   const handleUploadMaterial = async (files: File[]) => {
     try {
-      // Create the form data object with the correct structure
       const formData: Body_courses_upload_materials = {
-        files: files, // Pass the array of files directly
+        files: files,
       };
-  
-      // Call the uploadMaterials API
       await CoursesService.uploadMaterials({
         courseId: course.id,
-        formData: formData, // Pass the correctly structured object
+        formData: formData,
       });
-  
-      // Invalidate queries to refresh the course details
       queryClient.invalidateQueries({ queryKey: ['courseDetails'] });
       showToast('Success!', 'Material uploaded successfully.', 'success');
     } catch (error) {
@@ -160,6 +155,7 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
     mutationFn: async (data: FormInputs) => {
       setSubmitting(true);
       try {
+        // Update course basic info
         const updatedCourse = await CoursesService.updateCourse({
           courseId: course.id,
           requestBody: {
@@ -170,12 +166,12 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
             end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : null,
           },
         });
-  
-        // Handle removed materials
+
+        // Handle materials
         const removedMaterials = courseDetails?.materials?.filter(
           m => !data.existingMaterials.includes(m)
         ) || [];
-  
+
         await Promise.all(
           removedMaterials.map(filename => 
             CoursesService.deleteMaterial({
@@ -184,19 +180,37 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
             })
           )
         );
-  
-        // Handle new material uploads
+
         if (data.materials?.length) {
           const uploadPayload: Body_courses_upload_materials = {
-            files: data.materials, // Directly pass the File[] array
+            files: data.materials,
           };
-  
           await CoursesService.uploadMaterials({
             courseId: course.id,
-            formData: uploadPayload, // Matches the expected type
+            formData: uploadPayload,
           });
         }
-  
+
+        // Handle role assignments
+        const currentRoleIds = courseDetails?.roles?.map(r => r.id) || [];
+        const rolesToAdd = data.role_ids.filter(id => !currentRoleIds.includes(id));
+        const rolesToRemove = currentRoleIds.filter(id => !data.role_ids.includes(id));
+
+        await Promise.all([
+          ...rolesToAdd.map(roleId => CoursesService.assignRoleToCourse({ courseId: course.id, roleId })),
+          ...rolesToRemove.map(roleId => CoursesService.unassignRoleFromCourse({ courseId: course.id, roleId }))
+        ]);
+
+        // Handle user assignments
+        const currentUserIds = courseDetails?.users?.map(u => u.id) || [];
+        const usersToAdd = data.user_ids.filter(id => !currentUserIds.includes(id));
+        const usersToRemove = currentUserIds.filter(id => !data.user_ids.includes(id));
+
+        await Promise.all([
+          ...usersToAdd.map(userId => CoursesService.assignUserToCourse({ courseId: course.id, userId })),
+          ...usersToRemove.map(userId => CoursesService.unassignUserFromCourse({ courseId: course.id, userId }))
+        ]);
+
         return updatedCourse;
       } finally {
         setSubmitting(false);
@@ -213,11 +227,6 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      if (users) {
-        users?.data.forEach(user => {
-          queryClient.invalidateQueries({ queryKey: ["userDetails", user.id] });
-        });
-      }
       queryClient.invalidateQueries({ queryKey: ["roles"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["courseDetails"] });
@@ -235,6 +244,7 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
   const filteredUsers = users?.data?.filter(user => 
     user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
   ) || [];
+
 
   return (
     <Modal 
@@ -453,26 +463,7 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
                           >
                             <TagLabel>{role.name}</TagLabel>
                             <TagCloseButton
-                              onClick={async (e) => {
-                                e.preventDefault()
-                                try {
-                                  await CoursesService.unassignRoleFromCourse({
-                                    courseId: course.id,
-                                    roleId: roleId,
-                                  })
-                                  onChange(value.filter(id => id !== roleId))
-                                  queryClient.invalidateQueries({ queryKey: ["courses"] })
-                                  queryClient.invalidateQueries({ queryKey: ["courseDetails"] })
-                                  showToast("Success!", "Role removed successfully.", "success")
-                                } catch (error) {
-                                  console.error(`Failed to remove role ${roleId}:`, error)
-                                  showToast(
-                                    "Error",
-                                    "Failed to remove role. Please try again.",
-                                    "error"
-                                  )
-                                }
-                              }}
+                              onClick={() => onChange(value.filter(id => id !== roleId))}
                             />
                           </Tag>
                         ) : null
@@ -583,26 +574,7 @@ const EditCourse = ({ course, isOpen, onClose }: EditCourseProps) => {
                           >
                             <TagLabel>{user.name}</TagLabel>
                             <TagCloseButton
-                              onClick={async (e) => {
-                                e.preventDefault()
-                                try {
-                                  await CoursesService.unassignUserFromCourse({
-                                    courseId: course.id,
-                                    userId: userId,
-                                  })
-                                  onChange(value.filter(id => id !== userId))
-                                  queryClient.invalidateQueries({ queryKey: ["courses"] })
-                                  queryClient.invalidateQueries({ queryKey: ["courseDetails"] })
-                                  showToast("Success!", "User removed successfully.", "success")
-                                } catch (error) {
-                                  console.error(`Failed to remove user ${userId}:`, error)
-                                  showToast(
-                                    "Error",
-                                    "Failed to remove user. Please try again.",
-                                    "error"
-                                  )
-                                }
-                              }}
+                              onClick={() => onChange(value.filter(id => id !== userId))}
                             />
                           </Tag>
                         ) : null

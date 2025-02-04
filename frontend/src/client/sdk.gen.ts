@@ -4,6 +4,7 @@ import type { CancelablePromise } from "./core/CancelablePromise"
 import { OpenAPI } from "./core/OpenAPI"
 import { request as __request } from "./core/request"
 import type {
+  CoursesGetUserCoursesResponse,
   CoursesCreateCourseData,
   CoursesCreateCourseResponse,
   CoursesReadCoursesData,
@@ -99,6 +100,18 @@ import type {
 } from "./types.gen"
 
 export class CoursesService {
+  /**
+   * Get User Courses
+   * @returns CourseDetailed Successful Response
+   * @throws ApiError
+   */
+  public static getUserCourses(): CancelablePromise<CoursesGetUserCoursesResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/me/courses",
+    })
+  }
+
   /**
    * Create Course
    * Create a new course. Only accessible by superusers.

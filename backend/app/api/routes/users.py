@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -9,6 +9,7 @@ from app.core.security import verify_password
 from app.utils import generate_new_account_email, send_email
 from app.api.deps import CurrentUser, CurrentSuperUser, SessionDep, SuperuserRequired
 from app.models import (
+    CourseDetailed,
     Message,
     UpdatePassword,
     User,
@@ -45,6 +46,7 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     session.delete(current_user)
     session.commit()
     return Message(message="User deleted successfully")
+
 
 @router.get("/", response_model=UsersPublic, dependencies=[SuperuserRequired])
 def get_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:

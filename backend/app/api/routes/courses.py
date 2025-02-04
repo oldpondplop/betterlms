@@ -34,6 +34,13 @@ from app.core.config import settings
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
+#user stuff /me/user
+@router.get("/me/courses", response_model=List[CourseDetailed])
+def get_user_courses(session: SessionDep, current_user: CurrentUser) -> Any:
+    user = session.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.courses
 
 # Helper function to get course by ID
 def get_course_by_id(session: SessionDep, course_id: UUID) -> Course:

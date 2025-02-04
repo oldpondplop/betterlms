@@ -221,6 +221,8 @@ export type ValidationError = {
   type: string
 }
 
+export type CoursesGetUserCoursesResponse = Array<CourseDetailed>
+
 export type CoursesCreateCourseData = {
   requestBody: CourseCreate
 }
