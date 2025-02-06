@@ -1,16 +1,22 @@
 from typing import List, Any
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+import logging
+
+from app import crud
+from app.models import NotificationCreate
 
 from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser
 from app.models import (
     Course, Quiz, QuizCreate, QuizPublic, QuizUpdate,
     QuizAttempt, QuizAttemptCreate, QuizAttemptPublic, QuizzesPublic,
-    Message
+    Message, User
 )
 from app import crud
 
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
+logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=QuizPublic)
 def create_quiz(
@@ -112,18 +118,44 @@ def submit_quiz_attempt(
     quiz_id: UUID,
     answers: List[int],
     current_user: CurrentUser,
+    admin_user: CurrentSuperUser,  # Use the superuser dependency
 ) -> Any:
     """Submit a quiz attempt."""
-    quiz = crud.get_quiz_by_id(session=session, quiz_id=quiz_id)
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    
-    return crud.create_quiz_attempt(
-        session=session,
-        quiz=quiz,
-        user=current_user,
-        answers=answers
-    )
+    try:
+        logger.info(f"Received quiz attempt for quiz_id: {quiz_id}, answers: {answers}")
+
+        quiz = crud.get_quiz_by_id(session=session, quiz_id=quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        # Calculate the quiz result
+        quiz_attempt = crud.create_quiz_attempt(
+            session=session,
+            quiz=quiz,
+            user=current_user,
+            answers=answers
+        )
+
+        logger.info(f"Quiz attempt result: {quiz_attempt}")
+
+        # Check if the user failed the quiz
+        if not quiz_attempt.passed:
+            # Use the admin_user from the dependency
+            notification_message = f"Employee {current_user.name} didn't pass the quiz."
+            print("333",admin_user.id)
+            crud.create_notification(
+                session,
+                NotificationCreate(
+                    user_id=admin_user.id,  # Use admin_user.id
+                    message=notification_message,
+                ),
+            )
+
+        return quiz_attempt
+
+    except Exception as e:
+        logger.error(f"Error submitting quiz attempt: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/{quiz_id}/attempts", response_model=List[QuizAttemptPublic])
 def get_quiz_attempts(

@@ -2,10 +2,12 @@ from typing import List, Optional, Sequence
 from uuid import UUID
 from sqlmodel import Session, select
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import Connection, func
 
 from app.models import (
     CourseUserLink,
+    Notification,
+    NotificationCreate,
     Quiz,
     QuizAttempt,
     QuizCreate,
@@ -516,3 +518,24 @@ def get_user_quiz_stats(
         "has_passed": any(attempt.passed for attempt in attempts),
         "remaining_attempts": max(0, quiz.max_attempts - len(attempts))
     }
+# NOTIFICATION REE
+def create_notification(db: Session, notification: NotificationCreate) -> Notification:
+    db_notification = Notification(**notification.dict())
+    db.add(db_notification)
+    db.commit()
+    db.refresh(db_notification)
+    return db_notification
+
+def get_notifications(db: Session, user_id: int) -> List[Notification]:
+    statement = select(Notification).where(Notification.user_id == user_id)
+    return db.exec(statement).all()
+
+def mark_notification_as_read(db: Session, notification_id: int) -> Notification:
+    db_notification = db.get(Notification, notification_id)
+    if not db_notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db_notification.is_read = True
+    db.add(db_notification)
+    db.commit()
+    db.refresh(db_notification)
+    return db_notification

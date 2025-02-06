@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
-from sqlmodel import Session, delete, select
+from sqlmodel import Session, delete, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser, SuperuserRequired
@@ -36,15 +36,21 @@ from app.core.config import settings
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 #user stuff /me/courses
-@router.get("/me/courses", response_model=List[CourseDetailed])
+@router.get("/me", response_model=List[CourseDetailed])
 def get_user_courses(session: SessionDep, current_user: CurrentUser) -> Any:
-    user = session.get(User, current_user.id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Fetch courses with materials
-    statement = select(Course).where(Course.users.any(id=current_user.id))  # Correct query
-    courses = session.exec(statement).all()
+    stmt = (
+        select(Course)
+        .join(CourseUserLink, Course.id == CourseUserLink.course_id, isouter=True)  # type: ignore
+        .join(CourseRoleLink, Course.id == CourseRoleLink.course_id, isouter=True)  # type: ignore
+        .where(
+            or_(
+                CourseUserLink.user_id == current_user.id,  # type: ignore
+                CourseRoleLink.role_id == current_user.role_id,  # type: ignore
+            )
+        )
+        .distinct()
+    )
+    courses = session.exec(stmt).all()
     
     return [
         CourseDetailed(

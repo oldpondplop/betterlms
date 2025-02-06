@@ -86,6 +86,20 @@ export type NewPassword = {
   new_password: string
 }
 
+export type NotificationCreate = {
+  message: string
+  is_read?: boolean
+  created_at?: string
+  user_id: string
+}
+
+export type NotificationPublic = {
+  message: string
+  is_read?: boolean
+  created_at?: string
+  id: string
+}
+
 export type PrivateUserCreate = {
   email: string
   password: string
@@ -348,6 +362,22 @@ export type LoginRecoverPasswordHtmlContentData = {
 }
 
 export type LoginRecoverPasswordHtmlContentResponse = string
+
+export type NotificationsGetNotificationsEndpointResponse =
+  Array<NotificationPublic>
+
+export type NotificationsCreateNotificationEndpointData = {
+  requestBody: NotificationCreate
+}
+
+export type NotificationsCreateNotificationEndpointResponse = NotificationPublic
+
+export type NotificationsMarkNotificationAsReadEndpointData = {
+  notificationId: number
+}
+
+export type NotificationsMarkNotificationAsReadEndpointResponse =
+  NotificationPublic
 
 export type PrivateCreateUserData = {
   requestBody: PrivateUserCreate

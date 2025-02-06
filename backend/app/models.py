@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime, date, timezone
 from typing import List, Optional
 from enum import Enum
-from pydantic import EmailStr
-from sqlalchemy import ForeignKey
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlmodel import Field, Relationship, SQLModel, Column, JSON, func
 from sqlalchemy.ext.mutable import MutableList
 
@@ -115,7 +115,8 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
-    
+    notifications: List["Notification"] = Relationship(back_populates="user")
+
     # Single role per user
     role_id: Optional[uuid.UUID] = Field(foreign_key="role.id", nullable=True)
     role: Optional[Role] = Relationship(back_populates="users")
@@ -315,3 +316,22 @@ class NewPassword(SQLModel):
 
 class Message(SQLModel):
     message: str
+
+
+class NotificationBase(SQLModel):
+    message: str
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NotificationCreate(NotificationBase):
+    user_id: uuid.UUID 
+    
+
+class Notification(NotificationBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id",  primary_key=True)
+
+    user: User = Relationship(back_populates="notifications")
+
+class NotificationPublic(NotificationBase):
+    id: uuid.UUID

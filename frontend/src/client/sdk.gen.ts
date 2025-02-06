@@ -44,6 +44,11 @@ import type {
   LoginResetPasswordResponse,
   LoginRecoverPasswordHtmlContentData,
   LoginRecoverPasswordHtmlContentResponse,
+  NotificationsGetNotificationsEndpointResponse,
+  NotificationsCreateNotificationEndpointData,
+  NotificationsCreateNotificationEndpointResponse,
+  NotificationsMarkNotificationAsReadEndpointData,
+  NotificationsMarkNotificationAsReadEndpointResponse,
   PrivateCreateUserData,
   PrivateCreateUserResponse,
   QuizzesCreateQuizData,
@@ -110,7 +115,7 @@ export class CoursesService {
   public static getUserCourses(): CancelablePromise<CoursesGetUserCoursesResponse> {
     return __request(OpenAPI, {
       method: "GET",
-      url: "/api/v1/courses/me/courses",
+      url: "/api/v1/courses/me",
     })
   }
 
@@ -573,6 +578,63 @@ export class LoginService {
       url: "/api/v1/password-recovery-html-content/{email}",
       path: {
         email: data.email,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+}
+
+export class NotificationsService {
+  /**
+   * Get Notifications Endpoint
+   * @returns NotificationPublic Successful Response
+   * @throws ApiError
+   */
+  public static getNotificationsEndpoint(): CancelablePromise<NotificationsGetNotificationsEndpointResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/",
+    })
+  }
+
+  /**
+   * Create Notification Endpoint
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns NotificationPublic Successful Response
+   * @throws ApiError
+   */
+  public static createNotificationEndpoint(
+    data: NotificationsCreateNotificationEndpointData,
+  ): CancelablePromise<NotificationsCreateNotificationEndpointResponse> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Mark Notification As Read Endpoint
+   * @param data The data for the request.
+   * @param data.notificationId
+   * @returns NotificationPublic Successful Response
+   * @throws ApiError
+   */
+  public static markNotificationAsReadEndpoint(
+    data: NotificationsMarkNotificationAsReadEndpointData,
+  ): CancelablePromise<NotificationsMarkNotificationAsReadEndpointResponse> {
+    return __request(OpenAPI, {
+      method: "PUT",
+      url: "/api/v1/{notification_id}/read",
+      path: {
+        notification_id: data.notificationId,
       },
       errors: {
         422: "Validation Error",

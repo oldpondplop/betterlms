@@ -1,53 +1,42 @@
 import React, { useState } from 'react';
 import { Box, Button, VStack, Text, Radio, RadioGroup, Flex, Modal, ModalOverlay, 
   ModalContent, ModalHeader, ModalBody, ModalFooter, Alert, AlertIcon, useToast } from '@chakra-ui/react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { QuizzesService, type QuizPublic, type QuizQuestion } from '../../client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QuizzesService, type QuizPublic, type QuizQuestion, type QuizAttemptPublic } from '../../client';
 
 interface TakeQuizProps {
   courseId: string;
+  quizData: QuizPublic;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
+const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, quizData, isOpen, onClose }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userAnswers, setUserAnswers] = useState<number[]>([]);
   const [answerStatus, setAnswerStatus] = useState<boolean[]>([]);
+  const [quizResult, setQuizResult] = useState<QuizAttemptPublic | null>(null);
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: quiz, isLoading, error } = useQuery<QuizPublic | null>({
-    queryKey: ['quizzes', courseId],
-    queryFn: async () => {
-      const response = await QuizzesService.readQuizzes();
-      return response.data.find(q => q.course_id === courseId) || null;
-    }
-  });
 
-  console.log('Quiz data:', quiz);
 
   const submitMutation = useMutation({
     mutationFn: async (answers: number[]) => {
-      if (!quiz?.id) throw new Error('Quiz ID not found');
-      console.log('Submitting answers:', {
-        quizId: quiz.id,
-        answers
+      if (!quizData?.id) throw new Error('Quiz ID not found');
+      return await QuizzesService.submitQuizAttempt({
+        quizId: quizData.id,
+        requestBody: answers
       });
-      try {
-        const response = await QuizzesService.submitQuizAttempt({
-          quizId: quiz.id,
-          requestBody: answers
-        });
-        console.log('Submit response:', response);
-        return response;
-      } catch (error) {
-        console.error('Submit error:', error);
-        throw error;
-      }
     },
-    onSuccess: () => {
-      toast({ title: 'Quiz submitted successfully', status: 'success' });
-      onClose();
+    onSuccess: (attempt) => {
+      setQuizResult(attempt);
+      queryClient.invalidateQueries({ queryKey: ['quizAttempts', courseId] });
+      toast({ 
+        title: `Quiz ${attempt.passed ? 'passed! 🎉' : 'completed'}`,
+        description: `Your score: ${attempt.score}%`,
+        status: attempt.passed ? 'success' : 'warning'
+      });
     },
     onError: (error) => {
       toast({ 
@@ -59,22 +48,16 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
   });
 
   if (!isOpen) return null;
-  if (isLoading) return <Text>Loading quiz...</Text>;
-  if (error) return <Alert status="error"><AlertIcon />Error loading quiz</Alert>;
-  if (!quiz?.questions?.length) return <Alert status="info"><AlertIcon />No questions</Alert>;
+  if (!quizData?.questions?.length) return <Alert status="info"><AlertIcon />No questions</Alert>;
 
-      console.log('Raw questions:', quiz.questions);
-    const questions = quiz.questions as QuizQuestion[];
-    console.log('Parsed questions:', questions);
-      const currentQuestionData = questions[currentQuestion];
-    console.log('Current question data:', currentQuestionData);
+  const questions = quizData.questions as QuizQuestion[];
+  const currentQuestionData = questions[currentQuestion];
 
   const handleAnswerChange = (value: string) => {
     const newAnswers = [...userAnswers];
     newAnswers[currentQuestion] = parseInt(value);
     setUserAnswers(newAnswers);
     
-    // Check answer against correct_index
     const newStatus = [...answerStatus];
     newStatus[currentQuestion] = parseInt(value) === currentQuestionData.correct_index;
     setAnswerStatus(newStatus);
@@ -91,9 +74,40 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
       typeof userAnswers[index] === 'number'
     );
     if (allQuestionsAnswered) {
+      console.log("Submitting answers:", userAnswers); // Add this line for debugging
       submitMutation.mutate(userAnswers);
+    } else {
+      toast({
+        title: 'Please answer all questions',
+        status: 'error',
+      });
     }
   };
+
+  if (quizResult) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Quiz {quizResult.passed ? 'Passed! 🎉' : 'Completed'}</ModalHeader>
+          <ModalBody>
+            <VStack spacing={4}>
+              <Text fontSize="xl">Your Score: {quizResult.score}%</Text>
+              <Text>
+                {quizResult.passed ? 
+                  "Congratulations! You've passed the quiz! 🌟" : 
+                  `You need ${quizData.passing_threshold}% to pass. Keep practicing!`}
+              </Text>
+              <Text>Attempt {quizResult.attempt_number} of {quizData.max_attempts}</Text>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" onClick={onClose}>Close</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
@@ -102,7 +116,6 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
         <ModalHeader>Course Quiz</ModalHeader>
         <ModalBody>
           <VStack spacing={6} align="stretch">
-            {/* Progress indicator */}
             <Flex align="center" mb={4}>
               {questions.map((_, index) => (
                 <React.Fragment key={index}>
