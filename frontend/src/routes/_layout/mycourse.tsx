@@ -1,135 +1,123 @@
 import {
-    Badge,
-    Box,
-    Button,
-    Container,
-    Flex,
-    Heading,
-    SkeletonText,
-    Table,
-    TableContainer,
-    Tbody,
-    Td,
-    Th,
-    Thead,
-    Tr,
-  } from "@chakra-ui/react";
-  import { useQuery, useQueryClient } from "@tanstack/react-query";
-  import { createFileRoute, useNavigate } from "@tanstack/react-router";
-  import { useEffect, useState } from "react";
-  import { z } from "zod";
-  
-  import { type CoursePublic, CoursesService } from "../../client";
-  import { PaginationFooter } from "../../components/Common/PaginationFooter";
-  
-  const coursesSearchSchema = z.object({
-    page: z.number().catch(1),
+  Badge,
+  Box,
+  Container,
+  Flex,
+  Heading,
+  Skeleton,
+  Spinner,
+  Alert,
+  AlertIcon,
+  Grid,
+  Card,
+  CardBody,
+  CardFooter,
+  Button,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { CoursesService, type CourseDetailed, type UserPublic } from "../../client";
+import Navbar from "../../components/Common/Navbar";
+import OpenMaterialsViewer from "../../components/Common/OpenMaterialsViewer";
+import TakeQuiz from "../../components/Common/TakeQuiz";
+
+export const Route = createFileRoute("/_layout/mycourse")({
+  component: Course,
+});
+
+function CourseCard({ course }: { course: CourseDetailed }) {
+  const { isOpen: isMaterialsOpen, onOpen: onMaterialsOpen, onClose: onMaterialsClose } = useDisclosure();
+  const { isOpen: isQuizOpen, onOpen: onQuizOpen, onClose: onQuizClose } = useDisclosure();
+  const materials = course.materials || [];
+
+  return (
+    <Card>
+      <CardBody>
+        <Heading size="md">{course.title}</Heading>
+        <Text>{course.description || "No description"}</Text>
+        <Flex gap={2} mt={2}>
+          <Box
+            w="2"
+            h="2"
+            borderRadius="50%"
+            bg={course.is_active ? "ui.success" : "ui.danger"}
+            alignSelf="center"
+          />
+          <Text>{course.is_active ? "Active" : "Inactive"}</Text>
+        </Flex>
+      </CardBody>
+      <CardFooter>
+        <Flex gap={2}>
+          <Button
+            colorScheme="blue"
+            onClick={onMaterialsOpen}
+            isDisabled={materials.length === 0}
+          >
+            Open Materials
+          </Button>
+          <Button colorScheme="green" onClick={onQuizOpen}>
+            Take Quiz
+          </Button>
+        </Flex>
+      </CardFooter>
+
+      <OpenMaterialsViewer courseId={course.id} isOpen={isMaterialsOpen} onClose={onMaterialsClose} />
+      <TakeQuiz courseId={course.id} isOpen={isQuizOpen} onClose={onQuizClose} />
+      </Card>
+  );
+}
+
+function CoursesGrid() {
+  const {
+    data: courses,
+    isPending,
+    error,
+  } = useQuery({
+    queryKey: ["userCourses"],
+    queryFn: () => CoursesService.getUserCourses(),
   });
-  
-  export const Route = createFileRoute("/_layout/mycourse")({
-    component: MyCourses,
-    validateSearch: (search) => coursesSearchSchema.parse(search),
-  });
-  
-  const PER_PAGE = 5;
-  
-  function getCoursesQueryOptions({ page, userId }: { page: number; userId: string }) {
-    return {
-      queryFn: () => CoursesService.getUserCourses(),
-      queryKey: ["courses", { page, userId }],
-    };
-  }
-  
-  function CoursesTable({ userId }: { userId: string }) {
-    const queryClient = useQueryClient();
-    const { page } = Route.useSearch();
-    const navigate = useNavigate({ from: Route.fullPath });
-    const setPage = (page: number) =>
-      navigate({ search: (prev: { [key: string]: string }) => ({ ...prev, page }) });
-  
-    const {
-      data: courses,
-      isPending,
-      isPlaceholderData,
-    } = useQuery({
-      ...getCoursesQueryOptions({ page, userId }),
-      placeholderData: (prevData) => prevData,
-    });
-  
-    const hasNextPage = !isPlaceholderData && courses?.length === PER_PAGE;
-    const hasPreviousPage = page > 1;
-  
-    useEffect(() => {
-      if (hasNextPage) {
-        queryClient.prefetchQuery(getCoursesQueryOptions({ page: page + 1, userId }));
-      }
-    }, [page, queryClient, hasNextPage, userId]);
-  
+
+  if (error) {
     return (
-      <TableContainer>
-        <Table size={{ base: "sm", md: "md" }}>
-          <Thead>
-            <Tr>
-              <Th width="40%">Course Title</Th>
-              <Th width="30%">Status</Th>
-              <Th width="30%">Actions</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {isPending ? (
-              <Tr>
-                {[...Array(3)].map((_, index) => (
-                  <Td key={index}>
-                    <SkeletonText noOfLines={1} paddingBlock="16px" />
-                  </Td>
-                ))}
-              </Tr>
-            ) : (
-              courses?.map((course) => (
-                <Tr key={course.id}>
-                  <Td>{course.title}</Td>
-                  <Td>
-                    <Flex gap={2} alignItems="center">
-                      <Box w="2" h="2" borderRadius="50%" bg={course.status === "completed" ? "ui.success" : "ui.warning"} />
-                      {course.status ? course.status.charAt(0).toUpperCase() + course.status.slice(1) : "Unknown"}
-                    </Flex>
-                  </Td>
-                  <Td>
-                    <Button as="a" href={`/course/${course.id}`} colorScheme="teal">
-                      View Course
-                    </Button>
-                  </Td>
-                </Tr>
-              ))
-            )}
-          </Tbody>
-        </Table>
-        <PaginationFooter
-          onChangePage={setPage}
-          page={page}
-          hasNextPage={hasNextPage}
-          hasPreviousPage={hasPreviousPage}
-        />
-      </TableContainer>
+      <Alert status="error">
+        <AlertIcon />
+        Error loading courses: {error.message}
+      </Alert>
     );
   }
-  
-  function MyCourses() {
-    const queryClient = useQueryClient();
-    const currentUser = queryClient.getQueryData<{ id: string }>(["currentUser"]);
-    const userId = currentUser?.id;
-  
-    if (!userId) return <div>Loading user data...</div>;
-  
-    return (
-      <Container maxW="full">
-        <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
-          My Courses
-        </Heading>
-        <CoursesTable userId={userId} />
-      </Container>
-    );
-  }
-  
-  export default MyCourses;
-  
+
+  return (
+    <Grid templateColumns="repeat(3, 1fr)" gap={6}>
+      {isPending
+        ? Array.from({ length: 6 }).map((_, index) => (
+            <Card key={index}>
+              <CardBody>
+                <Skeleton height="20px" mb={4} />
+                <Skeleton height="20px" mb={4} />
+                <Skeleton height="20px" />
+              </CardBody>
+              <CardFooter>
+                <Skeleton height="40px" width="100%" />
+              </CardFooter>
+            </Card>
+          ))
+        : courses?.map((course) => <CourseCard key={course.id} course={course} />)}
+    </Grid>
+  );
+}
+
+function Course() {
+  return (
+    <Container maxW="full">
+      <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
+        My Courses
+      </Heading>
+      <Navbar type="Course" addModalAs={"symbol"} />
+      <CoursesGrid />
+    </Container>
+  );
+}
+
+export default Course;

@@ -33,9 +33,9 @@ export type CourseDetailed = {
   start_date?: string | null
   end_date?: string | null
   id: string
+  quiz?: QuizPublic | null
   roles?: Array<RolePublic>
   users?: Array<UserPublic>
-  quiz?: QuizPublic | null
   materials?: Array<string>
 }
 
@@ -56,6 +56,7 @@ export type CoursePublic = {
   start_date?: string | null
   end_date?: string | null
   id: string
+  quiz?: QuizPublic | null
 }
 
 export type CoursesPublic = {
@@ -308,6 +309,12 @@ export type CoursesDownloadMaterialData = {
 }
 
 export type CoursesDownloadMaterialResponse = unknown
+
+export type CoursesGetMaterialUrlData = {
+  filename: string
+}
+
+export type CoursesGetMaterialUrlResponse = unknown
 
 export type CoursesDeleteMaterialData = {
   courseId: string

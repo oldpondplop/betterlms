@@ -3,10 +3,11 @@ from uuid import UUID
 from typing import Any, List
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, delete, select
+from sqlalchemy.orm import Session
 
 from app.api.deps import SessionDep, CurrentUser, CurrentSuperUser, SuperuserRequired
 from app.models import (
@@ -34,13 +35,32 @@ from app.core.config import settings
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
-#user stuff /me/user
+#user stuff /me/courses
 @router.get("/me/courses", response_model=List[CourseDetailed])
 def get_user_courses(session: SessionDep, current_user: CurrentUser) -> Any:
     user = session.get(User, current_user.id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user.courses
+    
+    # Fetch courses with materials
+    statement = select(Course).where(Course.users.any(id=current_user.id))  # Correct query
+    courses = session.exec(statement).all()
+    
+    return [
+        CourseDetailed(
+            id=course.id,
+            title=course.title,
+            description=course.description,
+            materials=course.materials,  # Ensure this is a list of strings
+            is_active=course.is_active,
+            start_date=course.start_date,
+            end_date=course.end_date,
+            roles=[RolePublic.model_validate(role) for role in course.roles],
+            users=[UserPublic.model_validate(user) for user in course.users],
+            quiz=QuizPublic.model_validate(course.quiz) if course.quiz else None,
+        )
+        for course in courses
+    ]
 
 # Helper function to get course by ID
 def get_course_by_id(session: SessionDep, course_id: UUID) -> Course:
@@ -75,7 +95,7 @@ def read_course(
         id=course.id,
         title=course.title,
         description=course.description,
-        materials=course.materials,
+        materials=course.materials,  # Include materials
         is_active=course.is_active,
         start_date=course.start_date,
         end_date=course.end_date,
@@ -344,15 +364,30 @@ def list_materials(course_id: uuid.UUID, session: SessionDep):
     db_course = session.get(Course, course_id)
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
-    return db_course.materials
+    return db_course.materials  # Ensure this is a list of strings
+
+
+
 
 @router.get("/materials/{filename}")
-def download_material(filename: str):
+def download_material(filename: str) -> Any:
     """Download or view a material."""
     file_path = settings.UPLOAD_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path, media_type="application/pdf", filename=filename)
+@router.get("/materials/url/{filename}")
+def get_material_url(filename: str, request: Request):
+    """Return the URL of the PDF file."""
+    file_path = settings.UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_url = str(request.url_for("download_material", filename=filename))
+    
+    return JSONResponse(content={"url": file_url})
+
+
 
 @router.delete("/{course_id}/materials/{filename}", response_model=Message, dependencies=[SuperuserRequired])
 def delete_material(session: SessionDep, course_id: uuid.UUID, filename: str) -> Any:

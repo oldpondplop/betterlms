@@ -150,6 +150,7 @@ class CourseCreate(CourseBase):
 
 class CoursePublic(CourseBase):
     id: uuid.UUID
+    quiz: Optional['QuizPublic'] = None  # Add quiz property
 
 class CoursesPublic(SQLModel):
     data: List[CoursePublic]

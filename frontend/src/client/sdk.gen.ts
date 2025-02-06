@@ -31,6 +31,8 @@ import type {
   CoursesListMaterialsResponse,
   CoursesDownloadMaterialData,
   CoursesDownloadMaterialResponse,
+  CoursesGetMaterialUrlData,
+  CoursesGetMaterialUrlResponse,
   CoursesDeleteMaterialData,
   CoursesDeleteMaterialResponse,
   LoginLoginAccessTokenData,
@@ -417,6 +419,29 @@ export class CoursesService {
     return __request(OpenAPI, {
       method: "GET",
       url: "/api/v1/courses/materials/{filename}",
+      path: {
+        filename: data.filename,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get Material Url
+   * Return the URL of the PDF file.
+   * @param data The data for the request.
+   * @param data.filename
+   * @returns unknown Successful Response
+   * @throws ApiError
+   */
+  public static getMaterialUrl(
+    data: CoursesGetMaterialUrlData,
+  ): CancelablePromise<CoursesGetMaterialUrlResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/courses/materials/url/{filename}",
       path: {
         filename: data.filename,
       },
