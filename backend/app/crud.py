@@ -131,15 +131,11 @@ def create_course(session: Session, course_in: CourseCreate) -> Course:
     """Create a new course and handle user/role assignments."""
     course = Course(**course_in.model_dump(exclude_unset=True, exclude={"users", "roles", "quiz"}))
     session.add(course)
-    # session.flush()
     session.commit()
     session.refresh(course)
     
     if course_in.users or course_in.roles:
         assign_users_and_roles(session, course.id, users_to_add=course_in.users, roles_to_add=course_in.roles)
-
-    if course_in.quiz:
-        session.add(Quiz(**course_in.quiz, course_id=course.id))
     
     session.commit()
     session.refresh(course)
@@ -160,81 +156,9 @@ def update_course(session: Session, db_course: Course, course_in: CourseUpdate) 
         roles_to_remove=course_in.roles_to_remove
     )
 
-    if course_in.quiz:
-        existing_quiz = session.exec(select(Quiz).where(Quiz.course_id == db_course.id)).first()
-        if existing_quiz:
-            for key, value in course_in.quiz.items():
-                setattr(existing_quiz, key, value)
-        else:
-            session.add(Quiz(**course_in.quiz, course_id=db_course.id))
-    
     session.commit()
     session.refresh(db_course)
     return db_course
-
-# NOTE: same as assign but orm.
-def orm_assign_users_and_roles(
-    session: Session, 
-    course_id: uuid.UUID,
-    users_to_add: list[uuid.UUID] | None = None,
-    users_to_remove: list[uuid.UUID] | None = None,
-    roles_to_add: list[uuid.UUID] | None = None,
-    roles_to_remove: list[uuid.UUID] | None = None
-) -> None:
-    """Assign users and roles to a course while maintaining explicit user assignments."""
-
-    # Get course object (ORM)
-    course = session.get(Course, course_id)
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    # Current users and roles in the course
-    existing_users = {user.id for user in course.users}
-    existing_roles = {role.id for role in course.roles}
-
-    # Validate users & roles exist before adding
-    valid_users = {user.id for user in session.exec(select(User).where(User.id.in_(users_to_add or []))).all()}
-    valid_roles = {role.id for role in session.exec(select(Role).where(Role.id.in_(roles_to_add or []))).all()}
-
-    # Remove invalid IDs (safety check)
-    users_to_add = set(users_to_add or []) & valid_users
-    roles_to_add = set(roles_to_add or []) & valid_roles
-    users_to_remove = set(users_to_remove or []) & existing_users
-    roles_to_remove = set(roles_to_remove or []) & existing_roles
-
-    # 📌 Assign users explicitly
-    for user_id in users_to_add - existing_users:
-        user = session.get(User, user_id)
-        if user:
-            course.users.append(user)
-
-    for user_id in users_to_remove:
-        user = session.get(User, user_id)
-        if user and user in course.users:
-            course.users.remove(user)
-
-    # 📌 Assign roles
-    for role_id in roles_to_add - existing_roles:
-        role = session.get(Role, role_id)
-        if role:
-            course.roles.append(role)
-            # Add users from this role explicitly
-            # for user in role.users:
-            #     if user.id not in existing_users:
-            #         course.users.append(user)
-
-    for role_id in roles_to_remove:
-        role = session.get(Role, role_id)
-        if role and role in course.roles:
-            course.roles.remove(role)
-            # Remove users from this role (if they were assigned only via this role)
-            # for user in role.users:
-            #     if not any(user in other_role.users for other_role in course.roles):
-            #         if user in course.users:
-            #             course.users.remove(user)
-
-    session.commit()
-    session.refresh(course)
 
 def assign_users_and_roles(
     session: Session, 
@@ -291,7 +215,6 @@ def upload_course_materials(session: Session, course_id: uuid.UUID, files: list[
     session.refresh(db_course)
     return db_course
 
-
 def list_course_materials(session: Session, course_id: uuid.UUID) -> list[str]:
     """List all materials attached to a course."""
     db_course = session.get(Course, course_id)
@@ -332,76 +255,97 @@ def delete_all_course_materials(session: Session, course_id: uuid.UUID) -> Messa
     session.commit()
     return Message(message="All course materials deleted successfully.")
 
-
-# ===========================
+# =========================================================
 #  QUIZ CRUD
-# ===========================
+# =========================================================
 
-def get_quiz_by_course_id(session: Session, course_id: uuid.UUID) -> Optional[Quiz]:
+def get_quiz_by_id(session: Session, quiz_id: uuid.UUID) -> Optional[Quiz]:
+    stmt = select(Quiz).where(Quiz.id == quiz_id)
+    return session.exec(stmt).first()
+
+def get_quiz_by_course(session: Session, course_id: uuid.UUID) -> Optional[Quiz]:
     stmt = select(Quiz).where(Quiz.course_id == course_id)
     return session.exec(stmt).first()
 
-def get_quiz_by_id(session: Session, quiz_id: uuid.UUID) -> Quiz:
-    quiz = session.get(Quiz, quiz_id)
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+def create_quiz(session: Session, quiz_in: QuizCreate) -> Quiz:
+    existing_quiz = get_quiz_by_course(session, quiz_in.course_id)
+    if existing_quiz:
+        raise HTTPException(status_code=400, detail="A quiz already exists for this course")
+    
+    quiz = Quiz(**quiz_in.model_dump())
+    session.add(quiz)
+    session.commit()
+    session.refresh(quiz)
     return quiz
 
-def create_quiz(session: Session, quiz_in: QuizCreate) -> Quiz:
-    db_quiz = Quiz.model_validate(quiz_in)
-    session.add(db_quiz)
-    session.commit()
-    session.refresh(db_quiz)
-    return db_quiz
-
 def update_quiz(session: Session, quiz_id: uuid.UUID, quiz_in: QuizUpdate) -> Quiz:
-    db_quiz = get_quiz_by_id(session, quiz_id)
-    update_data = quiz_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_quiz, key, value)
+    quiz = get_quiz_by_id(session, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    for key, value in quiz_in.model_dump(exclude_unset=True).items():
+        setattr(quiz, key, value)
     session.commit()
-    session.refresh(db_quiz)
-    return db_quiz
+    session.refresh(quiz)
+    return quiz
 
-def delete_quiz(session: Session, quiz_id: uuid.UUID) -> Message:
-    db_quiz = get_quiz_by_id(session, quiz_id)
-    session.delete(db_quiz)
+def delete_quiz(session: Session, quiz_id: uuid.UUID) -> None:
+    quiz = get_quiz_by_id(session, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    session.delete(quiz)
     session.commit()
-    return Message(message="Quiz deleted successfully")
 
+# =========================================================
+#  QUIZ ATTEMPT CRUD
+# =========================================================
 
-# ===========================
-# QUIZ ATTEMPT CRUD OPERATIONS
-# ===========================
+def get_attempts_for_quiz(session: Session, quiz_id: uuid.UUID) -> Sequence[QuizAttempt]:
+    stmt = select(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id)
+    return session.exec(stmt).all()
+
+def get_attempts_for_user(session: Session, quiz_id: uuid.UUID, user_id: uuid.UUID) -> Sequence[QuizAttempt]:
+    stmt = select(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id, QuizAttempt.user_id == user_id)
+    return session.exec(stmt).all()
+
+def get_attempts_for_course(session: Session, course_id: uuid.UUID) -> Sequence[QuizAttempt]:
+    stmt = select(QuizAttempt).join(Quiz).where(Quiz.course_id == course_id)
+    return session.exec(stmt).all()
+
+def get_attempts_for_user_in_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID) -> Sequence[QuizAttempt]:
+    stmt = select(QuizAttempt).join(Quiz).where(Quiz.course_id == course_id, QuizAttempt.user_id == user_id)
+    return session.exec(stmt).all()
 
 def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> QuizAttempt:
-    """Record a new quiz attempt for a user."""
-    quiz_attempt = QuizAttempt.model_validate(attempt_in)
-    
-    # Ensure user has not exceeded max attempts
-    existing_attempts = session.exec(
-        select(QuizAttempt).where(QuizAttempt.quiz_id == attempt_in.quiz_id, QuizAttempt.user_id == attempt_in.user_id)
-    ).all()
-
     quiz = get_quiz_by_id(session, attempt_in.quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    existing_attempts = get_attempts_for_user(session, attempt_in.quiz_id, attempt_in.user_id)
     if len(existing_attempts) >= quiz.max_attempts:
         raise HTTPException(status_code=400, detail="Max attempts exceeded")
-
-    session.add(quiz_attempt)
+    
+    attempt = QuizAttempt(**attempt_in.model_dump())
+    session.add(attempt)
     session.commit()
-    session.refresh(quiz_attempt)
-    return quiz_attempt
+    session.refresh(attempt)
+    return attempt
 
-def get_course_analytics(session: Session, course_id: uuid.UUID) -> CourseAnalytics:
-    if not session.get(Course, course_id):
-        raise HTTPException(status_code=404, detail="Course not found")
-    
-    total_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id)).one()
-    completed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.COMPLETED)).one()
-    failed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.FAILED)).one()
-    avg_attempts = session.exec(select(func.avg(CourseUserLink.attempt_count)).where(CourseUserLink.course_id == course_id)).one()
-    avg_score = session.exec(select(func.avg(CourseUserLink.score)).where(CourseUserLink.course_id == course_id, CourseUserLink.score.isnot(None))).one()  # type: ignore
-    
+def delete_quiz_attempt(session: Session, attempt_id: uuid.UUID) -> None:
+    attempt = session.get(QuizAttempt, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Quiz attempt not found")
+    session.delete(attempt)
+    session.commit()
+
+def get_course_analytics(session: Session, course_id: uuid.UUID):
+    users = get_course_users(session, course_id)
+    total_users = len(users)
+    completed_users = sum(1 for user in users if session.exec(select(func.count()).where(QuizAttempt.user_id == user.id, QuizAttempt.passed == True)).one() > 0)
+    failed_users = sum(1 for user in users if session.exec(select(func.count()).where(QuizAttempt.user_id == user.id, QuizAttempt.passed == False)).one() >= 3)
+    avg_attempts = session.exec(select(func.avg(QuizAttempt.attempt_number)).join(Quiz).where(Quiz.course_id == course_id)).one()
+    avg_score = session.exec(select(func.avg(QuizAttempt.score)).join(Quiz).where(Quiz.course_id == course_id, QuizAttempt.score.isnot(None))).one()
+ 
     return CourseAnalytics(
         total_users=total_users,
         completed_users=completed_users,
@@ -409,25 +353,3 @@ def get_course_analytics(session: Session, course_id: uuid.UUID) -> CourseAnalyt
         average_attempts=avg_attempts or 0,
         average_score=avg_score or 0
     )
-
-def get_course_progress(session: Session, course_id: uuid.UUID) -> list[CourseUserProgress]:
-    """Retrieve user progress for a course."""
-    if not session.get(Course, course_id):
-        raise HTTPException(status_code=404, detail="Course not found")
-    
-    users_progress = session.exec(
-        select(User, CourseUserLink.status, CourseUserLink.attempt_count, CourseUserLink.score)
-        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
-        .where(CourseUserLink.course_id == course_id)
-    ).all()
-    
-    return [
-        CourseUserProgress(
-            user=user,
-            status=status,
-            attempt_count=attempts or 0,
-            score=score or 0
-        ) for user, status, attempts, score in users_progress
-    ]
-
-

@@ -17,6 +17,9 @@ from app.models import (
     CourseUpdate,
     CourseUserLink,
     Message,
+    Quiz,
+    QuizAttempt,
+    QuizAttemptPublic,
     StatusEnum,
     User,
 )
@@ -78,50 +81,40 @@ def delete_course(course_id: uuid.UUID, session: SessionDep):
     session.commit()
     return Message(message="Course deleted successfully")
 
-# ================================
-# COURSE ANALYTICS ENDPOINT
-# ================================
+
+# =========================================================
+#  QUIZ Attempts
+# =========================================================
+
+@router.get("/{course_id}/attempts", response_model=List[QuizAttemptPublic])
+def get_course_attempts(course_id: uuid.UUID, session: SessionDep):
+    """Retrieve all quiz attempts for a given course."""
+    return crud.get_attempts_for_course(session, course_id)
+
+@router.get("/{course_id}/users/{user_id}/attempts", response_model=List[QuizAttemptPublic])
+def get_user_course_attempts(course_id: uuid.UUID, user_id: uuid.UUID, session: SessionDep):
+    """Retrieve all quiz attempts for a given user in a specific course."""
+    return crud.get_attempts_for_user_in_course(session, course_id, user_id)
+
+# =========================================================
+#  COURSE ANALYTICS & PROGRESS
+# =========================================================
 
 @router.get("/{course_id}/analytics", response_model=CourseAnalytics)
 def get_course_analytics(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve analytics for a specific course."""
-    if not session.get(Course, course_id):
-        raise HTTPException(status_code=404, detail="Course not found")
-    
-    total_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id)).one()
-    completed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.COMPLETED)).one()
-    failed_users = session.exec(select(func.count()).where(CourseUserLink.course_id == course_id, CourseUserLink.status == StatusEnum.FAILED)).one()
-    avg_attempts = session.exec(select(func.avg(CourseUserLink.attempt_count)).where(CourseUserLink.course_id == course_id)).one()
-    avg_score = session.exec(select(func.avg(CourseUserLink.score)).where(CourseUserLink.course_id == course_id, CourseUserLink.score.isnot(None))).one()  # type: ignore
-    
-    return CourseAnalytics(
-        total_users=total_users,
-        completed_users=completed_users,
-        failed_users=failed_users,
-        average_attempts=avg_attempts or 0,
-        average_score=avg_score or 0
-    )
+    return crud.get_course_analytics(session, course_id)
 
 @router.get("/{course_id}/progress", response_model=List[CourseUserProgress])
 def get_course_progress(course_id: uuid.UUID, session: SessionDep):
-    """Retrieve user progress for a course."""
-    if not session.get(Course, course_id):
-        raise HTTPException(status_code=404, detail="Course not found")
-    
-    users_progress = session.exec(
-        select(User, CourseUserLink.status, CourseUserLink.attempt_count, CourseUserLink.score)
-        .join(CourseUserLink, CourseUserLink.user_id == User.id)  # type: ignore
-        .where(CourseUserLink.course_id == course_id)
-    ).all()
-    
-    return [
-        CourseUserProgress(
-            user=user,
-            status=status,
-            attempt_count=attempts or 0,
-            score=score or 0
-        ) for user, status, attempts, score in users_progress
-    ]
+    users = crud.get_course_users(session, course_id)
+    users_progress = []
+    for user in users:
+        attempts = crud.get_attempts_for_user_in_course(session, course_id, user.id)
+        attempt_count = len(attempts)
+        score = sum(a.score for a in attempts if a.score is not None) / attempt_count if attempt_count > 0 else 0
+        status = StatusEnum.PASSED if any(a.passed for a in attempts) else (StatusEnum.FAILED if attempt_count >= 3 else StatusEnum.IN_PROGRESS)
+        users_progress.append(CourseUserProgress(user=user, status=status, attempt_count=attempt_count, score=score))
+    return users_progress
 
 # ================================
 # FILE UPLOADS & MATERIALS
@@ -130,42 +123,16 @@ def get_course_progress(course_id: uuid.UUID, session: SessionDep):
 @router.post("/{course_id}/materials/", response_model=CoursePublic, dependencies=[SuperuserRequired])
 def upload_materials(course_id: uuid.UUID, session: SessionDep, files: List[UploadFile] = File(...)):
     """Upload multiple files and attach them to a course."""
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    for file in files:
-        new_file_path = settings.UPLOAD_DIR / f"{uuid.uuid4().hex}_{file.filename}"
-        with new_file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        db_course.materials.append(new_file_path.name)
-
-    session.commit()
-    session.refresh(db_course)
-    return db_course
+    return crud.upload_course_materials(session, course_id, files)
 
 @router.get("/{course_id}/materials/", response_model=List[str])
 def list_materials(course_id: uuid.UUID, session: SessionDep):
     """List all materials for a course."""
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return db_course.materials
+    return crud.list_course_materials(session, course_id)
 
 @router.delete("/{course_id}/materials/", response_model=Message, dependencies=[SuperuserRequired])
 def delete_all_materials(session: SessionDep, course_id: uuid.UUID) -> Any:
-   db_course = session.get(Course, course_id)
-   if not db_course:
-       raise HTTPException(status_code=404, detail="Course not found")
-
-   for filename in db_course.materials:
-       file_path = settings.UPLOAD_DIR / filename
-       if file_path.exists():
-           file_path.unlink()
-   
-   db_course.materials = []
-   session.commit()
-   return Message(message="All course materials deleted successfully")
+    return crud.delete_all_course_materials(session, course_id)
 
 @router.get("/materials/{filename}")
 def download_material(filename: str):
@@ -177,18 +144,4 @@ def download_material(filename: str):
 
 @router.delete("/{course_id}/materials/{filename}", response_model=Message, dependencies=[SuperuserRequired])
 def delete_material(session: SessionDep, course_id: uuid.UUID, filename: str) -> Any:
-    db_course = session.get(Course, course_id)
-    if not db_course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    if filename not in db_course.materials:
-        raise HTTPException(status_code=404, detail="Material not found in this course")
-    
-    db_course.materials.remove(filename)
-    session.add(db_course)
-    session.commit()
-    session.refresh(db_course)
-
-    file_path = settings.UPLOAD_DIR / filename
-    if file_path.exists():
-        file_path.unlink()
-    return Message(message="Course material deleted sucessfuly.")
+    return crud.delete_course_material(session, course_id, filename)

@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from typing import Optional
 from enum import Enum
-from pydantic import EmailStr, BaseModel
+from pydantic import EmailStr, BaseModel, field_validator, validator
 from sqlalchemy import ForeignKey
 from sqlmodel import Field, Relationship, SQLModel, Column
 from sqlalchemy.ext.mutable import MutableList
@@ -30,9 +30,6 @@ class CourseRoleLink(SQLModel, table=True):
 class CourseUserLink(SQLModel, table=True):
     course_id: uuid.UUID = Field(foreign_key="course.id", ondelete="CASCADE", primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", primary_key=True)
-    status: StatusEnum = Field(default=StatusEnum.ASSIGNED)
-    attempt_count: int = Field(default=0, description="Number of quiz attempts made by the user")
-    score: Optional[int] = Field(default=None, description="Highest quiz score achieved")
 
 # ================================
 # ROLE MODELS
@@ -96,7 +93,7 @@ class User(UserBase, table=True):
     role_id: Optional[uuid.UUID] = Field(default=None, foreign_key="role.id", ondelete="SET NULL")
     role: Optional[Role] = Relationship(back_populates="users")
     courses: list["Course"] = Relationship(back_populates="users", link_model=CourseUserLink) 
-    quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="user")
+    # quiz_attempts: list["QuizAttempt"] = Relationship(back_populates="user")
 
 # ================================
 # COURSE MODELS
@@ -112,7 +109,6 @@ class CourseBase(SQLModel):
 class CourseCreate(CourseBase):
     users: Optional[list[uuid.UUID]] = []
     roles: Optional[list[uuid.UUID]] = []
-    quiz: Optional[dict] = None
 
 class CoursePublicMe(CourseBase):
     id: uuid.UUID
@@ -121,15 +117,7 @@ class CoursePublic(CourseBase):
     id: uuid.UUID
     users: list[UserPublic]
     roles: list[RolePublic]
-    quiz: Optional["QuizPublic"]
-
-class CourseMaterialUpdate(SQLModel):
-    remove_files: list[str] = []
-    new_files: list[str] = []
-
-class CourseMaterialPublic(SQLModel):
-    course_id: uuid.UUID
-    materials: list[str]
+    # quiz: Optional["QuizPublic"]
 
 class CourseUpdate(SQLModel):
     title: Optional[str] = None
@@ -141,13 +129,12 @@ class CourseUpdate(SQLModel):
     users_to_remove: Optional[list[uuid.UUID]] = None
     roles_to_add: Optional[list[uuid.UUID]] = None
     roles_to_remove: Optional[list[uuid.UUID]] = None
-    quiz: Optional[dict] = None
 
 class CourseUserProgress(SQLModel):
     user: UserPublic
     status: StatusEnum
     attempt_count: int
-    score: Optional[int]
+    score: Optional[float]
 
 class CourseAnalytics(SQLModel):
     total_users: int
@@ -159,35 +146,45 @@ class CourseAnalytics(SQLModel):
 class Course(CourseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     materials: list[str] = Field(default_factory=list, sa_column=Column(MutableList.as_mutable(JSON())))
+    quiz: Optional["Quiz"] = Relationship(back_populates="course")
     roles: list[Role] = Relationship(back_populates="courses", link_model=CourseRoleLink)
     users: list[User] = Relationship(back_populates="courses", link_model=CourseUserLink)
-    quiz: Optional["Quiz"] = Relationship(back_populates="course")
 
 # ================================
 # QUIZ MODELS
 # ================================
 
+class Question(SQLModel):
+    question_text: str
+    options: list[str] = Field(..., min_items=2, max_items=5)
+    correct_index: int = Field(..., ge=0)
+    
+    @field_validator("correct_index")
+    def validate_correct_index(cls, v, values):
+        if "options" in values and v >= len(values["options"]):
+            raise ValueError("Correct index exceeds number of options")
+        return v
+
 class QuizBase(SQLModel):
     max_attempts: int = Field(default=3)
-    passing_threshold: int = Field(default=70)
-    questions: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    passing_threshold: float = Field(70.0, ge=0, le=100)
+    questions: list[Question] = Field(default_factory=list, sa_column=Column(JSON))
 
 class QuizCreate(QuizBase):
-    pass
-    # course_id: Optional[uuid.UUID]
+    course_id: uuid.UUID
 
 class QuizPublic(QuizBase):
     id: uuid.UUID
-    # course_id: Optional[uuid.UUID]
+    course_id: uuid.UUID
 
 class QuizUpdate(SQLModel):
     max_attempts: Optional[int] = None
-    passing_threshold: Optional[int] = None
-    questions: Optional[list[dict]] = None
+    passing_threshold: Optional[float] = None
+    questions: Optional[list[Question]] = None
 
 class Quiz(QuizBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    course_id: Optional[uuid.UUID] = Field(default=None, foreign_key="course.id", nullable=True)
+    course_id: uuid.UUID = Field(foreign_key="course.id", ondelete="CASCADE")
     course: Optional[Course] = Relationship(back_populates="quiz")
     attempts: list["QuizAttempt"] = Relationship(back_populates="quiz")
 
@@ -196,30 +193,61 @@ class Quiz(QuizBase, table=True):
 # ================================
 
 class QuizAttemptBase(SQLModel):
-    score: int
-    attempt_number: int
-    passed: bool = Field(default=False)
+    selected_indexes: list[int] = Field(default_factory=list, sa_column=Column(JSON))
 
 class QuizAttemptCreate(QuizAttemptBase):
     quiz_id: uuid.UUID
     user_id: uuid.UUID
 
+class QuizAttemptResult(SQLModel):
+    question_text: str
+    options: list[str]
+    correct_index: int
+    selected_index: int
+    is_correct: bool
+
 class QuizAttemptPublic(QuizAttemptBase):
     id: uuid.UUID
     quiz_id: uuid.UUID
     user_id: uuid.UUID
-
-class QuizAttemptUpdate(SQLModel):
-    score: Optional[int] = None
-    attempt_number: Optional[int] = None
-    passed: Optional[bool] = None
+    score: float
+    passed: bool
+    attempt_number: int
+    results: list[QuizAttemptResult]
 
 class QuizAttempt(QuizAttemptBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     quiz_id: uuid.UUID = Field(foreign_key="quiz.id", ondelete="CASCADE")
     user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE")
     quiz: Quiz = Relationship(back_populates="attempts")
-    user: User = Relationship(back_populates="quiz_attempts")
+
+    @property
+    def score(self) -> float:
+        """Compute the score as a percentage of correct answers."""
+        if not self.quiz:
+            return 0.0
+
+        correct = 0
+        for i, question in enumerate(self.quiz.questions):
+            if i < len(self.selected_indexes) and self.selected_indexes[i] == question.correct_index:
+                correct += 1
+
+        total_questions = len(self.quiz.questions)
+        return (correct / total_questions) * 100 if total_questions > 0 else 0.0
+
+    @property
+    def passed(self) -> bool:
+        """Determine if the attempt passed based on the quiz's passing threshold."""
+        return self.score >= self.quiz.passing_threshold if self.quiz else False
+
+    @property
+    def attempt_number(self) -> int:
+        """Compute the attempt number dynamically based on the user's attempts."""
+        if not self.quiz:
+            return 0
+        attempts = self.quiz.attempts
+        user_attempts = [a for a in attempts if a.user_id == self.user_id]
+        return user_attempts.index(self) + 1 if self in user_attempts else 0
 
 # =========================================================
 #  Auth & Token Models
