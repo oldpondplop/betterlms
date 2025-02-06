@@ -314,11 +314,11 @@ def create_quiz_attempt(
             status_code=400,
             detail="Number of answers doesn't match number of questions"
         )
-    
+    print(quiz.questions[0]) 
     # Calculate score
     correct_answers = sum(
         1 for i, answer in enumerate(answers)
-        if answer == quiz.questions[i].correct_index
+        if answer == quiz.questions[i].get('correct_index')
     )
     score = int((correct_answers / len(quiz.questions)) * 100)
     
@@ -330,7 +330,7 @@ def create_quiz_attempt(
         passed=score >= quiz.passing_threshold,
         attempt_number=attempt_count + 1
     )
-    
+    print('jabajeaba',answers)
     session.add(attempt)
     session.commit()
     session.refresh(attempt)

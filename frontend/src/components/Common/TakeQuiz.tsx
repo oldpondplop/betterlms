@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
-import {
-  Box, Button, VStack, Text, Radio, RadioGroup, Progress, 
-  Flex, Heading, Alert, AlertIcon, useToast, Modal, ModalOverlay, 
-  ModalContent, ModalHeader, ModalBody, ModalFooter
-} from '@chakra-ui/react';
+import { Box, Button, VStack, Text, Radio, RadioGroup, Flex, Modal, ModalOverlay, 
+  ModalContent, ModalHeader, ModalBody, ModalFooter, Alert, AlertIcon, useToast } from '@chakra-ui/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { QuizzesService, type QuizPublic, type QuizQuestion } from '../../client';
 
@@ -16,6 +13,7 @@ interface TakeQuizProps {
 const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userAnswers, setUserAnswers] = useState<number[]>([]);
+  const [answerStatus, setAnswerStatus] = useState<boolean[]>([]);
   const toast = useToast();
 
   const { data: quiz, isLoading, error } = useQuery<QuizPublic | null>({
@@ -26,13 +24,26 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
     }
   });
 
+  console.log('Quiz data:', quiz);
+
   const submitMutation = useMutation({
-    mutationFn: (answers: number[]) => {
+    mutationFn: async (answers: number[]) => {
       if (!quiz?.id) throw new Error('Quiz ID not found');
-      return QuizzesService.submitQuizAttempt({
+      console.log('Submitting answers:', {
         quizId: quiz.id,
-        requestBody: answers
+        answers
       });
+      try {
+        const response = await QuizzesService.submitQuizAttempt({
+          quizId: quiz.id,
+          requestBody: answers
+        });
+        console.log('Submit response:', response);
+        return response;
+      } catch (error) {
+        console.error('Submit error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({ title: 'Quiz submitted successfully', status: 'success' });
@@ -52,14 +63,21 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
   if (error) return <Alert status="error"><AlertIcon />Error loading quiz</Alert>;
   if (!quiz?.questions?.length) return <Alert status="info"><AlertIcon />No questions</Alert>;
 
-  const questions = quiz.questions as QuizQuestion[];
-  const currentQuestionData = questions[currentQuestion];
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+      console.log('Raw questions:', quiz.questions);
+    const questions = quiz.questions as QuizQuestion[];
+    console.log('Parsed questions:', questions);
+      const currentQuestionData = questions[currentQuestion];
+    console.log('Current question data:', currentQuestionData);
 
   const handleAnswerChange = (value: string) => {
     const newAnswers = [...userAnswers];
     newAnswers[currentQuestion] = parseInt(value);
     setUserAnswers(newAnswers);
+    
+    // Check answer against correct_index
+    const newStatus = [...answerStatus];
+    newStatus[currentQuestion] = parseInt(value) === currentQuestionData.correct_index;
+    setAnswerStatus(newStatus);
   };
 
   const handleNext = () => {
@@ -68,14 +86,11 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
     }
   };
 
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1);
-    }
-  };
-
   const handleSubmit = () => {
-    if (userAnswers.length === questions.length) {
+    const allQuestionsAnswered = questions.every((_, index) => 
+      typeof userAnswers[index] === 'number'
+    );
+    if (allQuestionsAnswered) {
       submitMutation.mutate(userAnswers);
     }
   };
@@ -87,8 +102,40 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
         <ModalHeader>Course Quiz</ModalHeader>
         <ModalBody>
           <VStack spacing={6} align="stretch">
-            <Progress value={progress} size="sm" colorScheme="blue" />
-            <Text>Question {currentQuestion + 1} of {questions.length}</Text>
+            {/* Progress indicator */}
+            <Flex align="center" mb={4}>
+              {questions.map((_, index) => (
+                <React.Fragment key={index}>
+                  <Box
+                    w="8"
+                    h="8"
+                    borderRadius="full"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    bg={
+                      currentQuestion === index ? 'blue.500' :
+                      answerStatus[index] === true ? 'green.500' :
+                      answerStatus[index] === false ? 'red.500' :
+                      'gray.600'
+                    }
+                    color="white"
+                  >
+                    {index + 1}
+                  </Box>
+                  {index < questions.length - 1 && (
+                    <Box flex="1" h="1" mx="2" bg="gray.600">
+                      <Box
+                        h="full"
+                        bg="blue.500"
+                        transition="width 0.3s"
+                        width={currentQuestion > index ? '100%' : '0%'}
+                      />
+                    </Box>
+                  )}
+                </React.Fragment>
+              ))}
+            </Flex>
 
             <Box>
               <Text fontSize="lg" mb={4}>{currentQuestionData.question}</Text>
@@ -104,16 +151,13 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, isOpen, onClose }) => {
         </ModalBody>
 
         <ModalFooter>
-          <Flex justify="space-between" width="100%">
-            <Button onClick={handlePrevious} isDisabled={currentQuestion === 0}>
-              Previous
-            </Button>
+          <Flex justify="flex-end" width="100%">
             {currentQuestion === questions.length - 1 ? (
               <Button
                 colorScheme="green"
                 onClick={handleSubmit}
                 isLoading={submitMutation.isPending}
-                isDisabled={userAnswers.length !== questions.length}
+                isDisabled={!questions.every((_, index) => typeof userAnswers[index] === 'number')}
               >
                 Submit Quiz
               </Button>
