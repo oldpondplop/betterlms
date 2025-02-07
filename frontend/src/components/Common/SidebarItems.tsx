@@ -15,6 +15,7 @@ const items = [
   { icon: FiHome, title: "Dashboard", path: "/" },
   { icon: FiBookOpen, title: "Courses", path: "/course" },
   { icon: FiFileText, title: "Quizzes", path: "/quiz" },
+  { icon: FiFileText, title: "Quiz Analytics", path: "/analytics" },
   { icon: FiSettings, title: "Roles", path: "/role" },
   { icon: FiSettings, title: "User Settings", path: "/settings" },
   { icon: FiSettings, title: "MyCourses", path: "/mycourse" },

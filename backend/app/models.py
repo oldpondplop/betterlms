@@ -265,6 +265,9 @@ class QuizAttemptPublic(QuizAttemptBase):
     id: uuid.UUID
     quiz_id: uuid.UUID
     user_id: uuid.UUID
+    user_name: str  # Add this field
+    user_email: str  # Add this field
+    course_name: str
 
 class QuizAttemptsPublic(SQLModel):
     data: List[QuizAttemptPublic]

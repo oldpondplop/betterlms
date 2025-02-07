@@ -115,6 +115,9 @@ export type QuizAttemptPublic = {
   id: string
   quiz_id: string
   user_id: string
+  user_name: string
+  user_email: string
+  course_name: string
 }
 
 export type QuizCreate = {
@@ -469,6 +472,13 @@ export type QuizzesGetCourseQuizProgressData = {
 export type QuizzesGetCourseQuizProgressResponse = {
   [key: string]: unknown
 }
+
+export type QuizzesGetAllQuizAttemptsData = {
+  limit?: number
+  skip?: number
+}
+
+export type QuizzesGetAllQuizAttemptsResponse = Array<QuizAttemptPublic>
 
 export type RolesGetRolesResponse = RolesPublic
 

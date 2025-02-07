@@ -1,8 +1,11 @@
-from typing import List, Any
+from statistics import mean
+from typing import Dict, List, Any
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import and_, distinct, func, select
 import logging
+
+from sqlmodel import Session
 
 from app import crud
 from app.models import NotificationCreate
@@ -243,3 +246,48 @@ def get_course_quiz(
     if not quiz:
         raise HTTPException(status_code=404, detail="No quiz found for this course")
     return quiz
+
+@router.get("/attempts/all", response_model=List[QuizAttemptPublic])
+def get_all_quiz_attempts(
+    *,
+    session: SessionDep,
+    admin_user: CurrentSuperUser,
+    skip: int = 0,
+    limit: int = 100,
+) -> Any:
+    """Get all quiz attempts across all quizzes (admin only)"""
+    stmt = (
+        select(
+            QuizAttempt.id,
+            QuizAttempt.score,
+            QuizAttempt.passed,
+            QuizAttempt.attempt_number,
+            QuizAttempt.created_at,
+            QuizAttempt.quiz_id,
+            QuizAttempt.user_id,
+            User.name.label("user_name"),
+            User.email.label("user_email"),
+            Course.title.label("course_name"),
+        )
+        .join(User, QuizAttempt.user_id == User.id)
+        .join(Quiz, QuizAttempt.quiz_id == Quiz.id)
+        .join(Course, Quiz.course_id == Course.id)
+        .order_by(QuizAttempt.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    
+    results = session.exec(stmt).all()
+    
+    return [{
+        "id": attempt.id,
+        "score": attempt.score,
+        "passed": attempt.passed,
+        "attempt_number": attempt.attempt_number,
+        "created_at": attempt.created_at,
+        "quiz_id": attempt.quiz_id,
+        "user_id": attempt.user_id,
+        "user_name": attempt.user_name,
+        "user_email": attempt.user_email,
+        "course_name": attempt.course_name
+    } for attempt in results]

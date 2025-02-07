@@ -539,3 +539,26 @@ def mark_notification_as_read(db: Session, notification_id: int) -> Notification
     db.commit()
     db.refresh(db_notification)
     return db_notification
+
+def get_all_quiz_attempts(session: Session, skip: int = 0, limit: int = 100) -> List[QuizAttempt]:
+    stmt = (
+        select(
+            QuizAttempt,
+            User.name.label("user_name"),
+            User.email.label("user_email"),
+            Course.title.label("course_name"),
+        )
+        .join(User)
+        .join(Quiz)
+        .join(Course)
+        .order_by(QuizAttempt.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    results = session.exec(stmt).all()
+    return [{
+        **attempt.QuizAttempt.dict(),
+        "user_name": attempt.user_name,
+        "user_email": attempt.user_email,
+        "course_name": attempt.course_name
+    } for attempt in results]

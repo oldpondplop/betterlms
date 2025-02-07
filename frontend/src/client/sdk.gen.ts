@@ -75,6 +75,8 @@ import type {
   QuizzesGetQuestionsAnalysisResponse,
   QuizzesGetCourseQuizProgressData,
   QuizzesGetCourseQuizProgressResponse,
+  QuizzesGetAllQuizAttemptsData,
+  QuizzesGetAllQuizAttemptsResponse,
   RolesGetRolesResponse,
   RolesCreateRoleData,
   RolesCreateRoleResponse,
@@ -949,6 +951,31 @@ export class QuizzesService {
       url: "/api/v1/quizzes/course/{course_id}/progress",
       path: {
         course_id: data.courseId,
+      },
+      errors: {
+        422: "Validation Error",
+      },
+    })
+  }
+
+  /**
+   * Get All Quiz Attempts
+   * Get all quiz attempts across all quizzes (admin only)
+   * @param data The data for the request.
+   * @param data.skip
+   * @param data.limit
+   * @returns QuizAttemptPublic Successful Response
+   * @throws ApiError
+   */
+  public static getAllQuizAttempts(
+    data: QuizzesGetAllQuizAttemptsData = {},
+  ): CancelablePromise<QuizzesGetAllQuizAttemptsResponse> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/quizzes/attempts/all",
+      query: {
+        skip: data.skip,
+        limit: data.limit,
       },
       errors: {
         422: "Validation Error",
