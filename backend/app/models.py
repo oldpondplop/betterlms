@@ -205,7 +205,7 @@ class QuizAttemptCreate(QuizAttemptBase):
     user_id: uuid.UUID
 
 class QuizAttemptResult(SQLModel):
-    question_text: str
+    question: str
     options: list[str]
     correct_index: int
     selected_index: int
@@ -217,7 +217,7 @@ class QuizAttemptPublic(QuizAttemptBase):
     user_id: uuid.UUID
     score: float
     passed: bool
-    results: list[QuizAttemptResult]  # NOTE: keep this?
+    # results: list[QuizAttemptResult]  # NOTE: keep this?
 
 class QuizAttempt(QuizAttemptBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

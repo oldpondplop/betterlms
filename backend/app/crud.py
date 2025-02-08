@@ -11,6 +11,7 @@ from app.models import (
     CourseUserProgress,
     QuizAttempt,
     QuizAttemptCreate,
+    QuizAttemptResult,
     StatusEnum,
     UpdatePassword,
     User,
@@ -277,6 +278,10 @@ def delete_all_course_materials(session: Session, course_id: uuid.UUID) -> Messa
 #  QUIZ CRUD
 # =========================================================
 
+def get_quizzes(session: Session, skip: int = 0, limit: int = 100) -> Sequence[Quiz]:
+    stmt = select(Quiz).offset(skip).limit(limit)
+    return session.exec(stmt).all()
+
 def get_quiz_by_id(session: Session, quiz_id: uuid.UUID) -> Optional[Quiz]:
     stmt = select(Quiz).where(Quiz.id == quiz_id)
     return session.exec(stmt).first()
@@ -286,6 +291,10 @@ def get_quiz_by_course(session: Session, course_id: uuid.UUID) -> Optional[Quiz]
     return session.exec(stmt).first()
 
 def create_quiz(session: Session, quiz_in: QuizCreate) -> Quiz:
+    db_course = session.get(Course, quiz_in.course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
     existing_quiz = get_quiz_by_course(session, quiz_in.course_id)
     if existing_quiz:
         raise HTTPException(status_code=400, detail="A quiz already exists for this course")
@@ -317,6 +326,22 @@ def delete_quiz(session: Session, quiz_id: uuid.UUID) -> None:
 # =========================================================
 #  QUIZ ATTEMPT CRUD (Optimized & Cycle-Aware)
 # =========================================================
+
+def calculate_attempt_results(attempt: QuizAttempt) -> list[QuizAttemptResult]:
+    """Calculate the results for a quiz attempt."""
+    quiz = attempt.quiz
+    results = []
+    for i, question in enumerate(quiz.questions):
+        selected_index = attempt.selected_indexes[i] if i < len(attempt.selected_indexes) else None
+        results.append(QuizAttemptResult(
+            question=question["question"],
+            options=question["options"],
+            correct_index=question["correct_index"],
+            selected_index=selected_index,
+            is_correct=selected_index == question["correct_index"]
+        ))
+    return results
+
 
 def get_attempts_for_quiz(session: Session, quiz_id: uuid.UUID, cycle: Optional[int] = None) -> Sequence[QuizAttempt]:
     """Return all attempts for a quiz, optionally filtered by assignment cycle."""
