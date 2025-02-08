@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from enum import Enum
 from pydantic import EmailStr, BaseModel, field_validator, validator
@@ -102,9 +102,9 @@ class User(UserBase, table=True):
 class CourseBase(SQLModel):
     title: str = Field(max_length=255)
     description: Optional[str] = Field(default=None, max_length=500)
-    is_active: bool = Field(default=True)
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    is_active: bool = Field(default=False)
+    due_date: Optional[date] = None
+    current_cycle: int = 1
 
 class CourseCreate(CourseBase):
     users: Optional[list[uuid.UUID]] = []
@@ -123,8 +123,9 @@ class CourseUpdate(SQLModel):
     title: Optional[str] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    increment_cycle: Optional[bool] = False
+    due_date: Optional[date] = None
+    current_cycle: Optional[int] = None
     users_to_add: Optional[list[uuid.UUID]] = None
     users_to_remove: Optional[list[uuid.UUID]] = None
     roles_to_add: Optional[list[uuid.UUID]] = None
@@ -134,14 +135,19 @@ class CourseUserProgress(SQLModel):
     user: UserPublic
     status: StatusEnum
     attempt_count: int
-    score: Optional[float]
+    score: float
 
 class CourseAnalytics(SQLModel):
     total_users: int
-    completed_users: int
+    passed_users: int
     failed_users: int
+    in_progress_users: int
+    course_completed: bool
+    completion_rate: float
+    pass_rate: float
+    fail_rate: float
     average_attempts: float
-    average_score: Optional[float]
+    average_score: float
 
 class Course(CourseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -155,21 +161,20 @@ class Course(CourseBase, table=True):
 # ================================
 
 class Question(SQLModel):
-    question_text: str
+    question: str
     options: list[str] = Field(..., min_items=2, max_items=5)
     correct_index: int = Field(..., ge=0)
     
-    @field_validator("correct_index")
-    def validate_correct_index(cls, v, values):
-        if "options" in values and v >= len(values["options"]):
-            raise ValueError("Correct index exceeds number of options")
-        return v
-
 class QuizBase(SQLModel):
     max_attempts: int = Field(default=3)
     passing_threshold: float = Field(70.0, ge=0, le=100)
-    questions: list[Question] = Field(default_factory=list, sa_column=Column(JSON))
-
+    questions: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    
+    def get_questions(self) -> list[Question]:
+        if isinstance(self.questions, list):
+            return [Question(**q) if isinstance(q, dict) else q for q in self.questions]
+        return self.questions
+    
 class QuizCreate(QuizBase):
     course_id: uuid.UUID
 
@@ -212,42 +217,28 @@ class QuizAttemptPublic(QuizAttemptBase):
     user_id: uuid.UUID
     score: float
     passed: bool
-    attempt_number: int
-    results: list[QuizAttemptResult]
+    results: list[QuizAttemptResult]  # NOTE: keep this?
 
 class QuizAttempt(QuizAttemptBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     quiz_id: uuid.UUID = Field(foreign_key="quiz.id", ondelete="CASCADE")
     user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE")
     quiz: Quiz = Relationship(back_populates="attempts")
-
+    assignment_cycle: int = Field(default=1)
+    created_at: datetime = Field(default_factory=datetime.utcnow) 
+    
     @property
     def score(self) -> float:
-        """Compute the score as a percentage of correct answers."""
-        if not self.quiz:
-            return 0.0
-
-        correct = 0
-        for i, question in enumerate(self.quiz.questions):
-            if i < len(self.selected_indexes) and self.selected_indexes[i] == question.correct_index:
-                correct += 1
-
-        total_questions = len(self.quiz.questions)
-        return (correct / total_questions) * 100 if total_questions > 0 else 0.0
+        correct = sum(
+            1 for i, q in enumerate(self.quiz.questions)
+            if i < len(self.selected_indexes) 
+            and self.selected_indexes[i] == q["correct_index"]
+        )
+        return (correct / len(self.quiz.questions)) * 100
 
     @property
     def passed(self) -> bool:
-        """Determine if the attempt passed based on the quiz's passing threshold."""
-        return self.score >= self.quiz.passing_threshold if self.quiz else False
-
-    @property
-    def attempt_number(self) -> int:
-        """Compute the attempt number dynamically based on the user's attempts."""
-        if not self.quiz:
-            return 0
-        attempts = self.quiz.attempts
-        user_attempts = [a for a in attempts if a.user_id == self.user_id]
-        return user_attempts.index(self) + 1 if self in user_attempts else 0
+        return self.score >= self.quiz.passing_threshold
 
 # =========================================================
 #  Auth & Token Models

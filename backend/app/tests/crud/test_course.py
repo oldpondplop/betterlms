@@ -2,7 +2,7 @@ import pytest
 from fastapi import HTTPException, UploadFile
 from sqlmodel import Session, select
 from app import crud
-from app.models import Course, CourseCreate, CourseUpdate, StatusEnum, CourseUserLink, CourseRoleLink
+from app.models import Course, CourseCreate, CourseUpdate, QuizAttemptCreate, QuizCreate, StatusEnum, CourseUserLink, CourseRoleLink
 from app.tests.utils.utils import random_name, random_role 
 from app.tests.utils.user import RoleEnum, create_random_user
 
@@ -126,6 +126,31 @@ def test_update_course_remove_roles(db: Session) -> None:
     assert len(updated_course.roles) == 1
 
 
+def test_update_course_increment_cycle(db: Session) -> None:
+    """Test incrementing the course cycle."""
+    course = crud.create_course(db, CourseCreate(title=random_name()))
+
+    update_data = CourseUpdate(increment_cycle=True)
+    updated_course = crud.update_course(db, course, update_data)
+
+    assert updated_course.current_cycle == 2
+
+
+def test_update_course_increment_cycle_with_other_fields(db: Session) -> None:
+    """Test that increment_cycle does not affect other fields."""
+    # Create a course with an initial cycle
+    course = crud.create_course(db, CourseCreate(title=random_name(), current_cycle=1))
+
+    # Update the course with increment_cycle=True and a new title
+    new_title = "Updated Course Title"
+    update_data = CourseUpdate(title=new_title, increment_cycle=True)
+    updated_course = crud.update_course(db, course, update_data)
+
+    # Assert that the cycle has incremented and the title is updated
+    assert updated_course.current_cycle == 2
+    assert updated_course.title == new_title
+
+
 def test_delete_course(db: Session) -> None:
     """Test deleting a course from the database."""
     course = crud.create_course(db, CourseCreate(title=random_name()))
@@ -198,37 +223,82 @@ def test_update_course_with_quiz(db: Session) -> None:
     assert updated_course.quiz.max_attempts == quiz_data["max_attempts"]
     assert updated_course.quiz.passing_threshold == quiz_data["passing_threshold"]
 
-@pytest.mark.xfail
+
 def test_get_course_analytics(db: Session) -> None:
     """Test retrieving course analytics."""
     user1 = create_random_user(db)
     user2 = create_random_user(db)
 
     course = crud.create_course(db, CourseCreate(title=random_name(), users=[user1.id, user2.id]))
+    quiz_data = {
+        "max_attempts": 3,
+        "passing_threshold": 80,
+        "questions": [
+            {"question": "What is 10+5?", "options": ["15", "20", "25"], "correct_index": 0},
+            {"question": "What is 10+10?", "options": ["15", "20", "25"], "correct_index": 1},
+        ]
+    }
 
-    db.exec(select(CourseUserLink).where(CourseUserLink.course_id == course.id, CourseUserLink.user_id == user1.id)).first().status = StatusEnum.COMPLETED
-    db.exec(select(CourseUserLink).where(CourseUserLink.course_id == course.id, CourseUserLink.user_id == user2.id)).first().status = StatusEnum.FAILED
-    db.commit()
+    quiz = crud.create_quiz(db, QuizCreate(course_id=course.id, **quiz_data))
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user1.id, selected_indexes=[0, 1]))
+    # user 2 fails with max attempts
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user2.id, selected_indexes=[1, 2]))
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user2.id, selected_indexes=[1, 2]))
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user2.id, selected_indexes=[1, 2]))
 
     analytics = crud.get_course_analytics(db, course.id)
 
     assert analytics.total_users == 2
-    assert analytics.completed_users == 1
-    assert analytics.failed_users == 1
+    assert analytics.passed_users == 1  # user1 passed
+    assert analytics.failed_users == 1  # user2 failed
+    assert analytics.in_progress_users == 0  # No one is in progress
+    assert analytics.course_completed is True  # All users either passed or failed
+    assert analytics.completion_rate == 100.0  # Everyone has finished the quiz
+    assert analytics.pass_rate == 50.0  # 1/2 users passed
+    assert analytics.fail_rate == 50.0  # 1/2 users failed
+    assert analytics.average_attempts == 2 
+    assert analytics.average_score == 50.0
 
-@pytest.mark.xfail
+
 def test_get_course_progress(db: Session) -> None:
     """Test retrieving user progress for a course."""
-    user = create_random_user(db)
-    course = crud.create_course(db, CourseCreate(title=random_name(), users=[user.id]))
+    user1 = create_random_user(db)
+    user2 = create_random_user(db)
 
+    course = crud.create_course(db, CourseCreate(title=random_name(), users=[user1.id, user2.id]))
+
+    quiz_data = {
+        "max_attempts": 3,
+        "passing_threshold": 80.0, 
+        "questions": [
+            {"question": "What is 10+5?", "options": ["15", "20", "25"], "correct_index": 0},
+            {"question": "What is 10+10?", "options": ["15", "20", "25"], "correct_index": 1}
+        ]
+    }
+
+    quiz = crud.create_quiz(db, QuizCreate(course_id=course.id, **quiz_data))
+    # User1 answers both questions correctly
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user1.id, selected_indexes=[0, 1]))
+    # User2 answers one question correctly and one incorrectly
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user2.id, selected_indexes=[1, 1]))
+    # Retrieve course progress
     progress = crud.get_course_progress(db, course.id)
+    # Assertions
+    assert len(progress) == 2  # Two users should have progress records
 
-    assert len(progress) == 1
-    assert progress[0].user.id == user.id
-    assert progress[0].status == StatusEnum.ASSIGNED
-    assert progress[0].attempt_count == 0
-    assert progress[0].score == 0
+    # Check User1's progress
+    user1_progress = next(p for p in progress if p.user.id == user1.id)
+    assert user1_progress.user.id == user1.id
+    assert user1_progress.status == StatusEnum.PASSED  # User1 passed the quiz
+    assert user1_progress.attempt_count == 1  # User1 made 1 attempt
+    assert user1_progress.score == 100.0  # User1 scored 100%
+
+    # Check User2's progress
+    user2_progress = next(p for p in progress if p.user.id == user2.id)
+    assert user2_progress.user.id == user2.id
+    assert user2_progress.status == StatusEnum.IN_PROGRESS  # User2 failed the quiz but has attempts left
+    assert user2_progress.attempt_count == 1  # User2 made 1 attempt
+    assert user2_progress.score == 50.0  # User2 scored 50%
 
 
 def test_list_course_materials(db: Session, course_with_materials):
@@ -241,6 +311,7 @@ def test_upload_course_materials(course_with_materials):
    course, files = course_with_materials
    assert course.id is not None
    assert len(course.materials) == len(files)
+
 
 def test_delete_course_material(db: Session, mock_upload_files):
    course = crud.create_course(db, CourseCreate(title="Test Course"))
@@ -258,62 +329,38 @@ def test_delete_all_course_materials(db: Session, course_with_materials):
    assert result.message == "All course materials deleted successfully."
 
 
-@pytest.mark.skip
-def test_quiz_progress_tracking(db: Session) -> None:
-    """Test quiz attempts and progress tracking."""
+def test_quiz_attempts_reset_after_cycle_increment(db: Session) -> None:
+    """Test that users can create new quiz attempts after cycle increment."""
+    # Create a user and a course
     user = create_random_user(db)
-    course = crud.create_course(db, CourseCreate(title=random_name(), users=[user.id]))
+    course = crud.create_course(db, CourseCreate(title=random_name(), users=[user.id], current_cycle=1))
 
+    # Create a quiz with max_attempts=1
     quiz_data = {
-        "max_attempts": 3,
-        "passing_threshold": 70,
+        "max_attempts": 1,
+        "passing_threshold": 80.0,
         "questions": [
-            {"question": "What is 2+2?", "choices": ["3", "4", "5"], "correct_index": 1}
+            {"question": "What is 10+5?", "options": ["15", "20", "25"], "correct_index": 0}
         ]
     }
-    course = crud.update_course(db, course, CourseUpdate(quiz=quiz_data))
+    quiz = crud.create_quiz(db, QuizCreate(course_id=course.id, **quiz_data))
 
-    quiz_attempt = crud.create_quiz_attempt(db, course.quiz.id, user.id, score=80, passed=True)
+    # User exhausts their attempts in the current cycle
+    crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user.id, selected_indexes=[0]))
 
-    assert quiz_attempt.quiz_id == course.quiz.id
-    assert quiz_attempt.user_id == user.id
-    assert quiz_attempt.passed is True
-    assert quiz_attempt.score == 80
-
-    progress = crud.get_course_progress(db, course.id)
-    assert progress[0].score == 80
-    assert progress[0].attempt_count == 1
-
-@pytest.mark.skip
-def test_quiz_max_attempts(db: Session) -> None:
-    """Test max quiz attempts and failure handling."""
-    user = create_random_user(db)
-    course = crud.create_course(db, CourseCreate(title=random_name(), users=[user.id]))
-
-    quiz_data = {
-        "max_attempts": 2,
-        "passing_threshold": 70,
-        "questions": [
-            {"question": "What is 10+10?", "choices": ["15", "20", "25"], "correct_index": 1}
-        ]
-    }
-    course = crud.update_course(db, course, CourseUpdate(quiz=quiz_data))
-
-    # First attempt - fail
-    quiz_attempt1 = crud.create_quiz_attempt(db, course.quiz.id, user.id, score=50, passed=False)
-    assert quiz_attempt1.attempt_number == 1
-
-    # Second attempt - fail
-    quiz_attempt2 = crud.create_quiz_attempt(db, course.quiz.id, user.id, score=60, passed=False)
-    assert quiz_attempt2.attempt_number == 2
-
-    # Third attempt - should be blocked
+    # Verify that the user cannot create another attempt in the same cycle
     with pytest.raises(HTTPException) as exc_info:
-        crud.create_quiz_attempt(db, course.quiz.id, user.id, score=75, passed=True)
+        crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user.id, selected_indexes=[0]))
+    
+    assert exc_info.value.status_code == 400
+    assert "Max attempts exceeded" in str(exc_info.value.detail)
 
-    assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Max attempts reached"
+    # Increment the course cycle
+    update_data = CourseUpdate(increment_cycle=True)
+    updated_course = crud.update_course(db, course, update_data)
+    assert updated_course.current_cycle == 2
 
-    progress = crud.get_course_progress(db, course.id)
-    assert progress[0].status == StatusEnum.FAILED
-    assert progress[0].attempt_count == 2
+    # Verify that the user can now create a new attempt in the new cycle
+    attempt = crud.create_quiz_attempt(db, QuizAttemptCreate(quiz_id=quiz.id, user_id=user.id, selected_indexes=[0]))
+    assert attempt is not None
+

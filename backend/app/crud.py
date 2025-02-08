@@ -1,7 +1,7 @@
 import shutil
 from typing import Optional, Sequence
 import uuid
-from sqlmodel import Session, select, delete, func
+from sqlmodel import Session, or_, select, delete, func
 from fastapi import HTTPException, UploadFile
 
 from app.models import (
@@ -117,10 +117,25 @@ def get_courses(session: Session, skip: int = 0, limit: int = 100) -> Sequence[C
     stmt = select(Course).offset(skip).limit(limit)
     return session.exec(stmt).all()
 
-def get_course_users(session: Session, course_id: uuid.UUID) -> list[User]:
-    if not (db_course := session.get(Course, course_id)):
-        raise HTTPException(status_code=404, detail="Course not found")
-    return list(set(db_course.users) | {user for role in db_course.roles for user in role.users})
+
+def get_course_users(session: Session, course_id: uuid.UUID) -> Sequence[User]:
+    stmt = (
+        select(User)
+        .join(CourseUserLink, CourseUserLink.user_id == User.id, isouter=True)  # Direct assignments
+        .join(Role, Role.id == User.role_id, isouter=True)  # Get user roles
+        .join(CourseRoleLink, CourseRoleLink.role_id == Role.id, isouter=True)  # Role-based assignments
+        .where(
+            or_(
+                CourseUserLink.course_id == course_id,  # Users directly assigned
+                CourseRoleLink.course_id == course_id   # Users via assigned roles
+            )
+        )
+        .distinct()  # Ensure no duplicates
+    )
+
+    users = session.exec(stmt).all()
+    return users
+
 
 def get_course_roles(session: Session, course_id: uuid.UUID) -> list[Role]:
     if not (db_course := session.get(Course, course_id)):
@@ -143,10 +158,13 @@ def create_course(session: Session, course_in: CourseCreate) -> Course:
 
 def update_course(session: Session, db_course: Course, course_in: CourseUpdate) -> Course:
     """Update course details, users, roles, and quiz assignments."""
-    course_data = course_in.model_dump(exclude_unset=True, exclude={"users_to_add", "users_to_remove", "roles_to_add", "roles_to_remove", "quiz"})
+    course_data = course_in.model_dump(exclude_unset=True, exclude={"users_to_add", "users_to_remove", "roles_to_add", "roles_to_remove", "quiz", "increment_cycle"})
     for key, value in course_data.items():
         setattr(db_course, key, value)
     
+    if course_in.increment_cycle:
+        db_course.current_cycle += 1
+ 
     assign_users_and_roles(
         session,
         db_course.id,
@@ -297,32 +315,55 @@ def delete_quiz(session: Session, quiz_id: uuid.UUID) -> None:
     session.commit()
 
 # =========================================================
-#  QUIZ ATTEMPT CRUD
+#  QUIZ ATTEMPT CRUD (Optimized & Cycle-Aware)
 # =========================================================
 
-def get_attempts_for_quiz(session: Session, quiz_id: uuid.UUID) -> Sequence[QuizAttempt]:
+def get_attempts_for_quiz(session: Session, quiz_id: uuid.UUID, cycle: Optional[int] = None) -> Sequence[QuizAttempt]:
+    """Return all attempts for a quiz, optionally filtered by assignment cycle."""
     stmt = select(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id)
+    if cycle is not None:
+        stmt = stmt.where(QuizAttempt.assignment_cycle == cycle)
     return session.exec(stmt).all()
 
-def get_attempts_for_user(session: Session, quiz_id: uuid.UUID, user_id: uuid.UUID) -> Sequence[QuizAttempt]:
-    stmt = select(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id, QuizAttempt.user_id == user_id)
+def get_attempts_for_user(session: Session, quiz_id: uuid.UUID, user_id: uuid.UUID, cycle: Optional[int] = None) -> Sequence[QuizAttempt]:
+    """Return all attempts for a user in a quiz, optionally filtered by cycle."""
+    stmt = select(QuizAttempt).where(
+        QuizAttempt.quiz_id == quiz_id,
+        QuizAttempt.user_id == user_id
+    )
+    if cycle is not None:
+        stmt = stmt.where(QuizAttempt.assignment_cycle == cycle)
     return session.exec(stmt).all()
 
-def get_attempts_for_course(session: Session, course_id: uuid.UUID) -> Sequence[QuizAttempt]:
+def get_attempts_for_user_in_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID, cycle: Optional[int] = None) -> Sequence[QuizAttempt]:
+    """Return all attempts for a user in a course, optionally filtered by cycle."""
+    stmt = select(QuizAttempt).join(Quiz).where(
+        Quiz.course_id == course_id,
+        QuizAttempt.user_id == user_id
+    )
+    if cycle is not None:
+        stmt = stmt.where(QuizAttempt.assignment_cycle == cycle)
+    return session.exec(stmt).all()
+
+def get_attempts_for_course(session: Session, course_id: uuid.UUID, cycle: Optional[int] = None) -> Sequence[QuizAttempt]:
+    """Return all attempts for a course, optionally filtered by cycle."""
     stmt = select(QuizAttempt).join(Quiz).where(Quiz.course_id == course_id)
-    return session.exec(stmt).all()
-
-def get_attempts_for_user_in_course(session: Session, course_id: uuid.UUID, user_id: uuid.UUID) -> Sequence[QuizAttempt]:
-    stmt = select(QuizAttempt).join(Quiz).where(Quiz.course_id == course_id, QuizAttempt.user_id == user_id)
+    if cycle is not None:
+        stmt = stmt.where(QuizAttempt.assignment_cycle == cycle)
     return session.exec(stmt).all()
 
 def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> QuizAttempt:
+    """Create a new quiz attempt, ensuring cycle limits are respected."""
     quiz = get_quiz_by_id(session, attempt_in.quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
-    existing_attempts = get_attempts_for_user(session, attempt_in.quiz_id, attempt_in.user_id)
-    if len(existing_attempts) >= quiz.max_attempts:
+    course = quiz.course
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    existing_cycle_attempts = get_attempts_for_user(session, attempt_in.quiz_id, attempt_in.user_id, course.current_cycle)
+    if len(existing_cycle_attempts) >= quiz.max_attempts:
         raise HTTPException(status_code=400, detail="Max attempts exceeded")
     
     attempt = QuizAttempt(**attempt_in.model_dump())
@@ -332,24 +373,122 @@ def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> Quiz
     return attempt
 
 def delete_quiz_attempt(session: Session, attempt_id: uuid.UUID) -> None:
+    """Delete a specific quiz attempt."""
     attempt = session.get(QuizAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=404, detail="Quiz attempt not found")
     session.delete(attempt)
     session.commit()
 
-def get_course_analytics(session: Session, course_id: uuid.UUID):
+def get_last_attempts(session: Session, quiz_id: uuid.UUID, cycle: int) -> dict[uuid.UUID, QuizAttempt]:
+    """
+    Retrieves the last (most recent) attempt per user for a given quiz and assignment cycle.
+    """
+    subq = (select(QuizAttempt.user_id, func.max(QuizAttempt.created_at).label("max_created_at"))
+            .where(QuizAttempt.quiz_id == quiz_id, QuizAttempt.assignment_cycle == cycle)
+            .group_by(QuizAttempt.user_id)
+            .subquery())
+
+    stmt = (select(QuizAttempt)
+            .join(subq, (QuizAttempt.user_id == subq.c.user_id) & (QuizAttempt.created_at == subq.c.max_created_at)))
+    
+    return {attempt.user_id: attempt for attempt in session.exec(stmt).all()}
+
+
+def get_course_analytics(session: Session, course_id: uuid.UUID) -> CourseAnalytics:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
     users = get_course_users(session, course_id)
     total_users = len(users)
-    completed_users = sum(1 for user in users if session.exec(select(func.count()).where(QuizAttempt.user_id == user.id, QuizAttempt.passed == True)).one() > 0)
-    failed_users = sum(1 for user in users if session.exec(select(func.count()).where(QuizAttempt.user_id == user.id, QuizAttempt.passed == False)).one() >= 3)
-    avg_attempts = session.exec(select(func.avg(QuizAttempt.attempt_number)).join(Quiz).where(Quiz.course_id == course_id)).one()
-    avg_score = session.exec(select(func.avg(QuizAttempt.score)).join(Quiz).where(Quiz.course_id == course_id, QuizAttempt.score.isnot(None))).one()
- 
+    current_cycle = db_course.current_cycle
+
+    quiz = session.exec(select(Quiz).where(Quiz.course_id == course_id)).first()
+    if not quiz:
+        return CourseAnalytics(
+            total_users=total_users,
+            passed_users=0,
+            failed_users=0,
+            in_progress_users=total_users,
+            course_completed=False,
+            completion_rate=0.0,
+            pass_rate=0.0,
+            fail_rate=0.0,
+            average_attempts=0.0,
+            average_score=0.0,
+        )
+
+    all_attempts: Sequence[QuizAttempt] = session.exec(
+        select(QuizAttempt)
+        .where(
+            QuizAttempt.quiz_id == quiz.id,
+            QuizAttempt.assignment_cycle == current_cycle
+        )
+        .order_by(QuizAttempt.user_id, QuizAttempt.created_at.asc())
+    ).all()
+
+    user_attempts_map = {user.id: [attempt for attempt in all_attempts if attempt.user_id == user.id] for user in users}
+
+    last_attempts = {user_id: attempts[-1] for user_id, attempts in user_attempts_map.items() if attempts}
+
+    passed_users = sum(1 for attempt in last_attempts.values() if attempt.passed)
+    failed_users = sum(1 for attempt in last_attempts.values() if not attempt.passed and len(user_attempts_map[attempt.user_id]) >= quiz.max_attempts)
+    in_progress_users = total_users - (passed_users + failed_users)
+
+    total_attempts = len(all_attempts)
+    
+    last_attempt_scores = [attempt.score for attempt in last_attempts.values()]
+
+    avg_attempts = total_attempts / total_users if total_users > 0 else 0.0
+    avg_score = sum(last_attempt_scores) / len(last_attempt_scores) if last_attempt_scores else 0.0
+
+    completion_rate = ((passed_users + failed_users) / total_users * 100) if total_users > 0 else 0.0
+    pass_rate = (passed_users / total_users * 100) if total_users > 0 else 0.0
+    fail_rate = (failed_users / total_users * 100) if total_users > 0 else 0.0
+    course_completed = in_progress_users == 0  # Course is fully completed when no one is "in progress"
+
     return CourseAnalytics(
         total_users=total_users,
-        completed_users=completed_users,
+        passed_users=passed_users,
         failed_users=failed_users,
-        average_attempts=avg_attempts or 0,
-        average_score=avg_score or 0
+        in_progress_users=in_progress_users,
+        course_completed=course_completed,
+        completion_rate=completion_rate,
+        pass_rate=pass_rate,
+        fail_rate=fail_rate,
+        average_attempts=avg_attempts,
+        average_score=avg_score,
     )
+
+
+def get_course_progress(session: Session, course_id: uuid.UUID) -> list[CourseUserProgress]:
+    db_course = session.get(Course, course_id)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    quiz = db_course.quiz
+    if not quiz:
+        raise HTTPException(status_code=404, detail="No quizz assigned")
+ 
+    users = get_course_users(session, course_id)
+    last_attempts = get_last_attempts(session, quiz.id, db_course.current_cycle)
+
+    users_progress = []
+    for user in users:
+        attempts = get_attempts_for_user(session, quiz.id, user.id, db_course.current_cycle)
+        last_attempt = last_attempts.get(user.id)
+        if not last_attempt:
+            status = StatusEnum.ASSIGNED
+            score = 0.0
+        else:
+            score = last_attempt.score
+            if last_attempt.passed:
+                status = StatusEnum.PASSED 
+            elif len(attempts) >= quiz.max_attempts:
+                status = StatusEnum.FAILED 
+            else:
+                status = StatusEnum.IN_PROGRESS 
+        users_progress.append(CourseUserProgress(user=user, status=status, attempt_count=len(attempts), score=score))
+    
+    return users_progress
