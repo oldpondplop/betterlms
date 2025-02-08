@@ -320,6 +320,7 @@ def delete_quiz(session: Session, quiz_id: uuid.UUID) -> None:
     quiz = get_quiz_by_id(session, quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
+    session.exec(delete(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id))
     session.delete(quiz)
     session.commit()
 

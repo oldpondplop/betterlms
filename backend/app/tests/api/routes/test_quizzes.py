@@ -216,3 +216,40 @@ def test_get_all_quizzes(client: TestClient, superuser_token_headers: dict[str, 
     assert len(quizzes) == 2
     assert quizzes[0]["max_attempts"] == quiz_data1["max_attempts"]
     assert quizzes[1]["max_attempts"] == quiz_data2["max_attempts"]
+
+
+def test_delete_quiz_with_attempts(client: TestClient, superuser_token_headers: dict[str, str], db: Session) -> None:
+    """Test deleting a quiz and its related attempts."""
+    # Create a course, a quiz, and a user
+    course = crud.create_course(db, CourseCreate(title=random_name()))
+    quiz_data = {
+        "course_id": str(course.id),
+        "max_attempts": 3,
+        "passing_threshold": 80.0,
+        "questions": [
+            {"question": "What is 10+5?", "options": ["15", "20", "25"], "correct_index": 0}
+        ]
+    }
+    quiz = crud.create_quiz(db, QuizCreate(**quiz_data))
+    user = create_random_user(db)
+
+    # Create a quiz attempt
+    attempt_data = QuizAttemptCreate(quiz_id=quiz.id, user_id=user.id, selected_indexes=[0])
+    crud.create_quiz_attempt(db, attempt_data)
+
+    # Delete the quiz
+    r = client.delete(
+        f"{settings.API_V1_STR}/quizzes/{quiz.id}",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+    response = r.json()
+    assert response["message"] == "Quiz deleted successfully"
+
+    # Verify the quiz is deleted
+    deleted_quiz = crud.get_quiz_by_id(db, quiz.id)
+    assert deleted_quiz is None
+
+    # Verify the attempt is deleted
+    attempts = crud.get_attempts_for_quiz(db, quiz.id)
+    assert len(attempts) == 0
