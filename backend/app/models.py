@@ -117,7 +117,7 @@ class CoursePublic(CourseBase):
     id: uuid.UUID
     users: list[UserPublic]
     roles: list[RolePublic]
-    # quiz: Optional["QuizPublic"]
+    quiz: Optional["QuizPublic"]
 
 class CourseUpdate(SQLModel):
     title: Optional[str] = None

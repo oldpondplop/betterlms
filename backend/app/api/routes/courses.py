@@ -101,15 +101,18 @@ def get_user_course_attempts(course_id: uuid.UUID, user_id: uuid.UUID, session: 
 def get_course_analytics(course_id: uuid.UUID, session: SessionDep):
     return crud.get_course_analytics(session, course_id)
 
+# TODO: fix this, make it work on last attempt, fix status, why its not updating?
 @router.get("/{course_id}/progress", response_model=List[CourseUserProgress], dependencies=[SuperuserRequired])
 def get_course_progress(course_id: uuid.UUID, session: SessionDep):
     users = crud.get_course_users(session, course_id)
+    quiz = crud.get_quiz_by_course(session, course_id)
+    if not quiz: return []
     users_progress = []
     for user in users:
         attempts = crud.get_attempts_for_user_in_course(session, course_id, user.id)
         attempt_count = len(attempts)
-        score = sum(a.score for a in attempts if a.score is not None) / attempt_count if attempt_count > 0 else 0
-        status = StatusEnum.PASSED if any(a.passed for a in attempts) else (StatusEnum.FAILED if attempt_count >= 3 else StatusEnum.IN_PROGRESS)
+        score = max(a.score for a in attempts) if attempt_count > 0 else 0
+        status = StatusEnum.PASSED if any(a.passed for a in attempts) else (StatusEnum.FAILED if attempt_count >= quiz.max_attempts else StatusEnum.IN_PROGRESS)
         users_progress.append(CourseUserProgress(user=user, status=status, attempt_count=attempt_count, score=score))
     return users_progress
 

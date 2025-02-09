@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 from faker import Faker
 from app import crud
 from app.core.config import settings
-from app.models import Course, CourseCreate
-from sqlmodel import Session
+from app.models import Course, CourseCreate, CourseRoleLink, CourseUserLink, User, Role
+from sqlmodel import Session, select
 
 fake = Faker()
 
@@ -26,3 +26,20 @@ def get_random_course() -> CourseCreate:
         start_date=fake.date_this_year(),
         end_date=fake.date_this_year(),
     )
+
+def assign_users_to_courses(db: Session):
+    users = db.exec(select(User)).all()
+    courses = db.exec(select(Course)).all()
+    roles = db.exec(select(Role)).all()
+
+    # Assign random users to random courses
+    for user in users:
+        course = random.choice(courses)
+        db.add(CourseUserLink(course_id=course.id, user_id=user.id))
+
+    # Assign random roles to random courses
+    for role in roles:
+        course = random.choice(courses)
+        db.add(CourseRoleLink(course_id=course.id, role_id=role.id))
+
+    db.commit()
