@@ -21,7 +21,7 @@ router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 # QUIZ MANAGEMENT
 # ================================
 
-@router.get("/", response_model=List[QuizPublic])
+@router.get("/", response_model=List[QuizPublic], dependencies=[SuperuserRequired])
 def get_all_quizzes(session: SessionDep):
     """Retrieve a list of all quizzes."""
     return crud.get_quizzes(session)
@@ -31,7 +31,7 @@ def create_quiz(quiz_in: QuizCreate, session: SessionDep):
     """Create a new quiz."""
     return crud.create_quiz(session, quiz_in)
 
-@router.get("/{quiz_id}", response_model=QuizPublic)
+@router.get("/{quiz_id}", response_model=QuizPublic, dependencies=[SuperuserRequired])
 def get_quiz(quiz_id: UUID, session: SessionDep):
     """Retrieve a quiz by its ID."""
     quiz = crud.get_quiz_by_id(session, quiz_id)
@@ -60,12 +60,12 @@ def delete_quiz(quiz_id: UUID, session: SessionDep):
 # QUIZ ATTEMPT MANAGEMENT
 # ================================
 
-@router.get("/{quiz_id}/attempts", response_model=List[QuizAttemptPublic])
+@router.get("/{quiz_id}/attempts", response_model=List[QuizAttemptPublic], dependencies=[SuperuserRequired])
 def get_quiz_attempts(quiz_id: UUID, session: SessionDep):
     """Retrieve all attempts for a specific quiz."""
     return crud.get_attempts_for_quiz(session, quiz_id)
 
-@router.get("/{quiz_id}/users/{user_id}/attempts", response_model=List[QuizAttemptPublic])
+@router.get("/{quiz_id}/users/{user_id}/attempts", response_model=List[QuizAttemptPublic], dependencies=[SuperuserRequired])
 def get_user_quiz_attempts(quiz_id: UUID, user_id: UUID, session: SessionDep):
     """Retrieve all attempts for a specific user in a quiz."""
     return crud.get_attempts_for_user(session, quiz_id, user_id)

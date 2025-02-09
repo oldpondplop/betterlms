@@ -118,25 +118,32 @@ def get_courses(session: Session, skip: int = 0, limit: int = 100) -> Sequence[C
     stmt = select(Course).offset(skip).limit(limit)
     return session.exec(stmt).all()
 
+def get_courses_for_user(session: Session, current_user: User) -> Sequence[Course]:
+    stmt = (
+        select(Course)
+        .outerjoin(CourseUserLink, Course.id == CourseUserLink.course_id)
+        .outerjoin(CourseRoleLink, Course.id == CourseRoleLink.course_id)
+    )
+
+    conditions = [CourseUserLink.user_id == current_user.id]
+    if current_user.role_id is not None:
+        conditions.append(CourseRoleLink.role_id == current_user.role_id)
+
+    stmt = stmt.where(or_(*conditions)).distinct()
+    return session.exec(stmt).all()
 
 def get_course_users(session: Session, course_id: uuid.UUID) -> Sequence[User]:
     stmt = (
         select(User)
-        .join(CourseUserLink, CourseUserLink.user_id == User.id, isouter=True)  # Direct assignments
-        .join(Role, Role.id == User.role_id, isouter=True)  # Get user roles
-        .join(CourseRoleLink, CourseRoleLink.role_id == Role.id, isouter=True)  # Role-based assignments
+        .outerjoin(CourseUserLink, CourseUserLink.user_id == User.id)  
+        .outerjoin(CourseRoleLink, CourseRoleLink.role_id == User.role_id)
         .where(
-            or_(
-                CourseUserLink.course_id == course_id,  # Users directly assigned
-                CourseRoleLink.course_id == course_id   # Users via assigned roles
-            )
+            (CourseUserLink.course_id == course_id) |  
+            ((CourseRoleLink.course_id == course_id) & (User.role_id.isnot(None)))
         )
-        .distinct()  # Ensure no duplicates
+        .distinct()
     )
-
-    users = session.exec(stmt).all()
-    return users
-
+    return session.exec(stmt).all()
 
 def get_course_roles(session: Session, course_id: uuid.UUID) -> list[Role]:
     if not (db_course := session.get(Course, course_id)):
