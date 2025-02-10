@@ -134,6 +134,7 @@ class CourseUserProgress(SQLModel):
     user: UserPublic
     status: StatusEnum
     attempt_count: int
+    max_attempts: int
     score: float
 
 class CourseAnalytics(SQLModel):

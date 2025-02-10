@@ -522,6 +522,6 @@ def get_course_progress(session: Session, course_id: uuid.UUID) -> list[CourseUs
                 status = StatusEnum.FAILED 
             else:
                 status = StatusEnum.IN_PROGRESS 
-        users_progress.append(CourseUserProgress(user=user, status=status, attempt_count=len(attempts), score=score))
+        users_progress.append(CourseUserProgress(user=user, status=status, attempt_count=len(attempts), max_attempts=quiz.max_attempts, score=score))
     
     return users_progress
