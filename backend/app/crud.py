@@ -398,8 +398,8 @@ def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> Quiz
     existing_cycle_attempts = get_attempts_for_user(session, attempt_in.quiz_id, attempt_in.user_id, course.current_cycle)
     if len(existing_cycle_attempts) >= quiz.max_attempts:
         raise HTTPException(status_code=400, detail="Max attempts exceeded")
-    
     attempt = QuizAttempt(**attempt_in.model_dump())
+    attempt.assignment_cycle = course.current_cycle
     session.add(attempt)
     session.commit()
     session.refresh(attempt)

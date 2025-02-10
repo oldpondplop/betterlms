@@ -2,8 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 from enum import Enum
-from pydantic import EmailStr, BaseModel, field_validator, validator
-from sqlalchemy import ForeignKey
+from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel, Column
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.types import JSON
