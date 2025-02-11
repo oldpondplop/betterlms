@@ -432,7 +432,6 @@ def get_last_attempts(session: Session, quiz_id: uuid.UUID, cycle: int) -> dict[
     
     return {attempt.user_id: attempt for attempt in session.exec(stmt).all()}
 
-
 def get_course_analytics(session: Session, course_id: uuid.UUID) -> CourseAnalytics:
     db_course = session.get(Course, course_id)
     if not db_course:
@@ -499,7 +498,6 @@ def get_course_analytics(session: Session, course_id: uuid.UUID) -> CourseAnalyt
         average_score=avg_score,
     )
 
-
 def get_course_progress(session: Session, course_id: uuid.UUID) -> list[CourseUserProgress]:
     db_course = session.get(Course, course_id)
     if not db_course:
@@ -542,19 +540,16 @@ def create_notification(session: Session, notification_in: NotificationCreate) -
     session.refresh(notification)
     return notification
 
-def get_notifications_for_user(session: Session, user_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Sequence[Notification]:
-    statement = select(Notification).where(Notification.user_id == user_id).offset(skip).limit(limit)
+def get_notifications(session: Session, user_id: uuid.UUID) -> Sequence[Notification]:
+    statement = select(Notification).where(Notification.user_id == user_id)
     return session.exec(statement).all()
 
-def mark_notification_as_read(session: Session, notification_id: uuid.UUID) -> Notification:
+def delete_notification(session: Session, notification_id: uuid.UUID) -> None:
     notification = session.get(Notification, notification_id)
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
-    notification.is_read = True
-    session.add(notification)
+    session.delete(notification)
     session.commit()
-    session.refresh(notification)
-    return notification
 
 def notify_admins_about_quiz_attempts(session: Session, quiz_id: uuid.UUID, user_id: uuid.UUID) -> None:
     admins = session.exec(select(User).where(User.is_superuser == True)).all()

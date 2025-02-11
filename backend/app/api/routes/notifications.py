@@ -1,8 +1,8 @@
 from typing import Any
 from fastapi import APIRouter
 from uuid import UUID
-from app.api.deps import SessionDep, CurrentUser, SuperuserRequired
-from app.models import Notification, NotificationCreate, NotificationPublic
+from app.api.deps import CurrentSuperUser, SessionDep, CurrentUser, SuperuserRequired
+from app.models import Message, Notification, NotificationCreate, NotificationPublic
 from app import crud
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -11,10 +11,11 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 def create_notification(*, session: SessionDep, notification_in: NotificationCreate) -> Any:
     return crud.create_notification(session=session, notification_in=notification_in)
 
-@router.get("/", response_model=list[NotificationPublic], dependencies=[SuperuserRequired])
-def get_notifications(*, session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100) -> Any:
-    return crud.get_notifications_for_user(session=session, user_id=current_user.id, skip=skip, limit=limit)
+@router.get("/", response_model=list[NotificationPublic])
+def get_notifications(*, session: SessionDep, admin_user: CurrentSuperUser) -> Any:
+    return crud.get_notifications(session=session, user_id=admin_user.id)
 
-@router.patch("/{notification_id}/mark-as-read", response_model=NotificationPublic, dependencies=[SuperuserRequired])
-def mark_notification_as_read(*, session: SessionDep, notification_id: UUID) -> Any:
-    return crud.mark_notification_as_read(session=session, notification_id=notification_id)
+@router.delete("/{notification_id}", response_model=NotificationPublic, dependencies=[SuperuserRequired])
+def delete_notification(*, session: SessionDep, notification_id: UUID) -> Message:
+    crud.delete_notification(session=session, notification_id=notification_id)
+    return Message(message="Notification marked as read")
