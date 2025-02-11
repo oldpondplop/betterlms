@@ -248,7 +248,6 @@ class QuizAttempt(QuizAttemptBase, table=True):
 class NotificationBase(SQLModel):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     message: str
-    is_read: bool = Field(default=False)
 
 class Notification(NotificationBase, table=True):
     id: Optional[uuid.UUID] = Field(default_factory=uuid.uuid4, primary_key=True)
