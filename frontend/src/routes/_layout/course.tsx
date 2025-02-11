@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Container,
   Flex,
   Heading,
@@ -8,6 +9,7 @@ import {
   TableContainer,
   Tbody,
   Td,
+  Text,
   Th,
   Thead,
   Tr,
@@ -18,7 +20,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect } from "react"
 import { z } from "zod"
 
-import { CoursesService} from "../../client"
+import { CoursesService } from "../../client"
 import AddCourse from "../../components/Course/AddCourse"
 import ActionsMenu from "../../components/Common/ActionsMenu"
 import Navbar from "../../components/Common/Navbar"
@@ -75,8 +77,10 @@ function CoursesTable() {
           <Tr>
             <Th fontSize="xs">TITLE</Th>
             <Th fontSize="xs">DESCRIPTION</Th>
-            <Th fontSize="xs">DUE DATE</Th>
-            <Th fontSize="xs">ASSIGNMENTS</Th>
+            <Th fontSize="xs">QUIZ</Th>
+            <Th fontSize="xs">MATERIALS</Th>
+            <Th fontSize="xs">ROLES</Th>
+            <Th fontSize="xs">USERS</Th>
             <Th fontSize="xs">STATUS</Th>
             <Th fontSize="xs">ACTIONS</Th>
           </Tr>
@@ -99,46 +103,55 @@ function CoursesTable() {
                 onClick={() => navigate({ to: "/courses/$courseId", params: { courseId: course.id } })}
               >
                 <Td>
-                  <Flex align="center" gap={2}>
-                    {course.title}
-                    {course.quiz && (
-                      <Badge colorScheme="purple" variant="subtle">
-                        quiz
-                      </Badge>
-                    )}
-                  </Flex>
+                  <Text>{course.title}</Text>
                 </Td>
-                <Td color={useColorModeValue("gray.600", "gray.300")} fontSize="sm">
+                <Td maxW="300px" isTruncated color={useColorModeValue("gray.600", "gray.300")} fontSize="sm">
                   {course.description || "No description"}
-                </Td>
-                <Td color={useColorModeValue("gray.600", "gray.300")} fontSize="sm">
-                  {course.due_date ? new Date(course.due_date).toLocaleDateString() : "-"}
-                </Td>
-                <Td>
-                  <Flex gap={2}>
-                    <Badge 
-                      colorScheme="blue" 
-                      variant="subtle"
-                      fontSize="xs"
-                    >
-                      {course.users.length} USERS
-                    </Badge>
-                    <Badge 
-                      colorScheme="purple" 
-                      variant="subtle"
-                      fontSize="xs"
-                    >
-                      {course.roles.length} ROLES
-                    </Badge>
-                  </Flex>
                 </Td>
                 <Td>
                   <Badge
-                    colorScheme={course.is_active ? "green" : "red"}
                     variant="subtle"
+                    colorScheme={course.quiz ? "teal" : "gray"}
                   >
-                    {course.is_active ? "ACTIVE" : "INACTIVE"}
+                    {course.quiz ? "AVAILABLE" : "NO"}
                   </Badge>
+                </Td>
+                <Td>
+                  <Badge
+                    variant="subtle"
+                    colorScheme={course.materials.length > 0 ? "teal" : "gray"}
+                  >
+                    {course.materials.length > 0 ? "AVAILABLE" : "NO"}
+                  </Badge>
+                </Td>
+                <Td>
+                  <Badge
+                    variant="subtle"
+                    colorScheme="blue"
+                  >
+                    {course.roles.length} ROLES
+                  </Badge>
+                </Td>
+                <Td>
+                  <Badge
+                    variant="subtle"
+                    colorScheme="orange"
+                  >
+                    {course.users.length} USERS
+                  </Badge>
+                </Td>
+                <Td>
+                  <Flex align="center" gap={2}>
+                    <Box 
+                      w="2" 
+                      h="2" 
+                      borderRadius="full" 
+                      bg={course.is_active ? useColorModeValue("green.500", "green.300") : useColorModeValue("red.500", "red.300")} 
+                    />
+                    <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")}>
+                      {course.is_active ? "Active" : "Inactive"}
+                    </Text>
+                  </Flex>
                 </Td>
                 <Td onClick={(e) => e.stopPropagation()}>
                   <ActionsMenu 
