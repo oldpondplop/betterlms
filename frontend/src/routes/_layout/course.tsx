@@ -1,6 +1,5 @@
 import {
   Badge,
-  Box,
   Container,
   Flex,
   Heading,
@@ -12,13 +11,14 @@ import {
   Th,
   Thead,
   Tr,
+  useColorModeValue,
 } from "@chakra-ui/react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect } from "react"
 import { z } from "zod"
 
-import { type CoursePublic, type UsersPublic, type RolesPublic, CoursesService } from "../../client"
+import { CoursesService} from "../../client"
 import AddCourse from "../../components/Course/AddCourse"
 import ActionsMenu from "../../components/Common/ActionsMenu"
 import Navbar from "../../components/Common/Navbar"
@@ -29,58 +29,37 @@ const coursesSearchSchema = z.object({
 })
 
 export const Route = createFileRoute("/_layout/course")({
-  component: CoursesAdmin,
+  component: Courses,
   validateSearch: (search) => coursesSearchSchema.parse(search),
 })
 
-const PER_PAGE = 5
+const PER_PAGE = 10
 
 function getCoursesQueryOptions({ page }: { page: number }) {
   return {
-    queryFn: (): Promise<{ data: CoursePublic[]; count: number }> =>
+    queryFn: () =>
       CoursesService.getCourses({ skip: (page - 1) * PER_PAGE, limit: PER_PAGE }),
     queryKey: ["courses", { page }],
   }
 }
 
-function CoursesTable(): JSX.Element {
+function CoursesTable() {
   const queryClient = useQueryClient()
   const { page } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const setPage = (page: number) =>
     navigate({ search: (prev: { [key: string]: string }) => ({ ...prev, page }) })
 
-  // Fetch courses
   const {
     data: courses,
     isPending,
     isPlaceholderData,
-  } = useQuery<{ data: CoursePublic[]; count: number }>({
+  } = useQuery({
     ...getCoursesQueryOptions({ page }),
     placeholderData: (prevData) => prevData,
   })
 
-  // Function to fetch assigned roles count
-  const getAssignedRolesCount = async (courseId: string): Promise<number> => {
-    try {
-      const response: RolesPublic = await CoursesService.getCourseRoles({ courseId })
-      return response.count
-    } catch {
-      return 0
-    }
-  }
-
-  // Function to fetch assigned users count
-  const getAssignedUsersCount = async (courseId: string): Promise<number> => {
-    try {
-      const response: UsersPublic = await CoursesService.getCourseUsers({ courseId })
-      return response.count
-    } catch {
-      return 0
-    }
-  }
-
-  const hasNextPage = !isPlaceholderData && courses?.data.length === PER_PAGE
+  const hasNextPage = !isPlaceholderData && courses?.length === PER_PAGE
   const hasPreviousPage = page > 1
 
   useEffect(() => {
@@ -91,15 +70,15 @@ function CoursesTable(): JSX.Element {
 
   return (
     <TableContainer>
-      <Table size={{ base: "sm", md: "md" }}>
+      <Table size={{ base: "sm", md: "md" }} variant="simple">
         <Thead>
           <Tr>
-            <Th width="25%">Course Title</Th>
-            <Th width="20%">Start Date</Th>
-            <Th width="20%">End Date</Th>
-            <Th width="10%">Roles</Th>
-            <Th width="10%">Users</Th>
-            <Th width="15%">Actions</Th>
+            <Th fontSize="xs">TITLE</Th>
+            <Th fontSize="xs">DESCRIPTION</Th>
+            <Th fontSize="xs">DUE DATE</Th>
+            <Th fontSize="xs">ASSIGNMENTS</Th>
+            <Th fontSize="xs">STATUS</Th>
+            <Th fontSize="xs">ACTIONS</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -112,51 +91,86 @@ function CoursesTable(): JSX.Element {
               ))}
             </Tr>
           ) : (
-            courses?.data.map((course) => (
-              <Tr key={course.id}>
-                <Td isTruncated maxWidth="200px">{course.title}</Td>
-                <Td>{course.start_date || "N/A"}</Td>
-                <Td>{course.end_date || "N/A"}</Td>
+            courses?.map((course) => (
+              <Tr 
+                key={course.id}
+                cursor="pointer"
+                _hover={{ bg: useColorModeValue("gray.50", "whiteAlpha.50") }}
+                onClick={() => navigate({ to: "/courses/$courseId", params: { courseId: course.id } })}
+              >
                 <Td>
-                  <AsyncCount fetchCount={() => getAssignedRolesCount(course.id)} />
+                  <Flex align="center" gap={2}>
+                    {course.title}
+                    {course.quiz && (
+                      <Badge colorScheme="purple" variant="subtle">
+                        quiz
+                      </Badge>
+                    )}
+                  </Flex>
+                </Td>
+                <Td color={useColorModeValue("gray.600", "gray.300")} fontSize="sm">
+                  {course.description || "No description"}
+                </Td>
+                <Td color={useColorModeValue("gray.600", "gray.300")} fontSize="sm">
+                  {course.due_date ? new Date(course.due_date).toLocaleDateString() : "-"}
                 </Td>
                 <Td>
-                  <AsyncCount fetchCount={() => getAssignedUsersCount(course.id)} />
+                  <Flex gap={2}>
+                    <Badge 
+                      colorScheme="blue" 
+                      variant="subtle"
+                      fontSize="xs"
+                    >
+                      {course.users.length} USERS
+                    </Badge>
+                    <Badge 
+                      colorScheme="purple" 
+                      variant="subtle"
+                      fontSize="xs"
+                    >
+                      {course.roles.length} ROLES
+                    </Badge>
+                  </Flex>
                 </Td>
                 <Td>
-                  <ActionsMenu type="Course" value={course} />
+                  <Badge
+                    colorScheme={course.is_active ? "green" : "red"}
+                    variant="subtle"
+                  >
+                    {course.is_active ? "ACTIVE" : "INACTIVE"}
+                  </Badge>
+                </Td>
+                <Td onClick={(e) => e.stopPropagation()}>
+                  <ActionsMenu 
+                    type="Course" 
+                    value={course}
+                  />
                 </Td>
               </Tr>
             ))
           )}
         </Tbody>
       </Table>
-      <PaginationFooter onChangePage={setPage} page={page} hasNextPage={hasNextPage} hasPreviousPage={hasPreviousPage} />
+      <PaginationFooter 
+        onChangePage={setPage} 
+        page={page} 
+        hasNextPage={hasNextPage} 
+        hasPreviousPage={hasPreviousPage} 
+      />
     </TableContainer>
   )
 }
 
-// Component to fetch and display async count
-function AsyncCount({ fetchCount }: { fetchCount: () => Promise<number> }): JSX.Element {
-  const { data, isLoading } = useQuery<number>({
-    queryKey: [fetchCount],
-    queryFn: fetchCount,
-  })
-
-  return isLoading ? <SkeletonText noOfLines={1} width="20px" /> : <>{data}</>
-}
-
-function CoursesAdmin(): JSX.Element {
+function Courses() {
   return (
     <Container maxW="full">
-      <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
+      <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12} color="white">
         Courses Management
       </Heading>
-
-      <Navbar type={"Course"} addModalAs={AddCourse} />
+      <Navbar type="Course" addModalAs={AddCourse} />
       <CoursesTable />
     </Container>
   )
 }
 
-export default CoursesAdmin
+export default Courses

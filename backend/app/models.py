@@ -117,6 +117,7 @@ class CoursePublic(CourseBase):
     users: list[UserPublic]
     roles: list[RolePublic]
     quiz: Optional["QuizPublic"]
+    materials: list[str] = []
 
 class CourseUpdate(SQLModel):
     title: Optional[str] = None
@@ -239,6 +240,26 @@ class QuizAttempt(QuizAttemptBase, table=True):
     @property
     def passed(self) -> bool:
         return self.score >= self.quiz.passing_threshold
+    
+# =========================================================
+#  Notifications
+# =========================================================
+
+class NotificationBase(SQLModel):
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    message: str
+    is_read: bool = Field(default=False)
+
+class Notification(NotificationBase, table=True):
+    id: Optional[uuid.UUID] = Field(default_factory=uuid.uuid4, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NotificationCreate(NotificationBase):
+    pass
+
+class NotificationPublic(NotificationBase):
+    id: uuid.UUID
+    created_at: datetime
 
 # =========================================================
 #  Auth & Token Models

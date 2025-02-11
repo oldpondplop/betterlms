@@ -1,6 +1,7 @@
 import shutil
 from typing import Optional, Sequence
 import uuid
+from app.api.deps import CurrentSuperUser
 from sqlmodel import Session, or_, select, delete, func
 from fastapi import HTTPException, UploadFile
 
@@ -9,6 +10,8 @@ from app.models import (
     CourseRoleLink,
     CourseUserLink,
     CourseUserProgress,
+    Notification,
+    NotificationCreate,
     QuizAttempt,
     QuizAttemptCreate,
     QuizAttemptResult,
@@ -332,7 +335,7 @@ def delete_quiz(session: Session, quiz_id: uuid.UUID) -> None:
     session.commit()
 
 # =========================================================
-#  QUIZ ATTEMPT CRUD (Optimized & Cycle-Aware)
+#  QUIZ ATTEMPT CRUD
 # =========================================================
 
 def calculate_attempt_results(attempt: QuizAttempt) -> list[QuizAttemptResult]:
@@ -385,7 +388,7 @@ def get_attempts_for_course(session: Session, course_id: uuid.UUID, cycle: Optio
         stmt = stmt.where(QuizAttempt.assignment_cycle == cycle)
     return session.exec(stmt).all()
 
-def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> QuizAttempt:
+def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate, admin_user: CurrentSuperUser,) -> QuizAttempt:
     """Create a new quiz attempt, ensuring cycle limits are respected."""
     quiz = get_quiz_by_id(session, attempt_in.quiz_id)
     if not quiz:
@@ -397,7 +400,9 @@ def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> Quiz
 
     existing_cycle_attempts = get_attempts_for_user(session, attempt_in.quiz_id, attempt_in.user_id, course.current_cycle)
     if len(existing_cycle_attempts) >= quiz.max_attempts:
+        notify_admins_about_quiz_attempts(session, quiz.id, attempt_in.user_id)
         raise HTTPException(status_code=400, detail="Max attempts exceeded")
+    
     attempt = QuizAttempt(**attempt_in.model_dump())
     attempt.assignment_cycle = course.current_cycle
     session.add(attempt)
@@ -525,3 +530,37 @@ def get_course_progress(session: Session, course_id: uuid.UUID) -> list[CourseUs
         users_progress.append(CourseUserProgress(user=user, status=status, attempt_count=len(attempts), max_attempts=quiz.max_attempts, score=score))
     
     return users_progress
+
+# =========================================================
+#  Notification CRUD
+# =========================================================
+
+def create_notification(session: Session, notification_in: NotificationCreate) -> Notification:
+    notification = Notification(**notification_in.model_dump())
+    session.add(notification)
+    session.commit()
+    session.refresh(notification)
+    return notification
+
+def get_notifications_for_user(session: Session, user_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Sequence[Notification]:
+    statement = select(Notification).where(Notification.user_id == user_id).offset(skip).limit(limit)
+    return session.exec(statement).all()
+
+def mark_notification_as_read(session: Session, notification_id: uuid.UUID) -> Notification:
+    notification = session.get(Notification, notification_id)
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notification.is_read = True
+    session.add(notification)
+    session.commit()
+    session.refresh(notification)
+    return notification
+
+def notify_admins_about_quiz_attempts(session: Session, quiz_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    admins = session.exec(select(User).where(User.is_superuser == True)).all()
+    for admin in admins:
+        notification = NotificationCreate(
+            user_id=admin.id,
+            message=f"User {user_id} exceeded max attempts for quiz {quiz_id}."
+        )
+        create_notification(session=session, notification_in=notification)

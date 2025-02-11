@@ -74,7 +74,7 @@ function UsersTable() {
     return role ? role.name : "N/A"
   }
 
-  const hasNextPage = !isPlaceholderData && users?.data.length === PER_PAGE
+  const hasNextPage = !isPlaceholderData && users?.length === PER_PAGE
   const hasPreviousPage = page > 1
 
   useEffect(() => {
@@ -106,7 +106,7 @@ function UsersTable() {
               ))}
             </Tr>
           ) : (
-            users?.data.map((user) => (
+            users?.map((user) => (
               <Tr key={user.id}>
                 <Td isTruncated maxWidth="120px">{user.user_id || "N/A"}</Td>
                 <Td isTruncated maxWidth="150px" color={!user.name ? "ui.dim" : "inherit"}>
