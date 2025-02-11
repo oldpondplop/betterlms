@@ -111,13 +111,15 @@ export type PrivateUserCreate = {
 export type QuizAttemptPublic = {
   score: number
   attempt_number: number
-  passed?: boolean
+  passed: boolean
   id: string
   quiz_id: string
   user_id: string
-  user_name: string
-  user_email: string
-  course_name: string
+  created_at: string
+  updated_at: string
+  user_name?: string | null
+  user_email?: string | null
+  course_name?: string | null
 }
 
 export type QuizCreate = {

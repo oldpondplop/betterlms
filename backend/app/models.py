@@ -265,9 +265,15 @@ class QuizAttemptPublic(QuizAttemptBase):
     id: uuid.UUID
     quiz_id: uuid.UUID
     user_id: uuid.UUID
-    user_name: str  # Add this field
-    user_email: str  # Add this field
-    course_name: str
+    score: int
+    passed: bool
+    attempt_number: int
+    created_at: datetime
+    updated_at: datetime
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    course_name: Optional[str] = None
+
 
 class QuizAttemptsPublic(SQLModel):
     data: List[QuizAttemptPublic]

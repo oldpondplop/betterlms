@@ -124,41 +124,51 @@ def submit_quiz_attempt(
     admin_user: CurrentSuperUser,  # Use the superuser dependency
 ) -> Any:
     """Submit a quiz attempt."""
-    try:
-        logger.info(f"Received quiz attempt for quiz_id: {quiz_id}, answers: {answers}")
+    logger.info(f"Received quiz attempt for quiz_id: {quiz_id}, answers: {answers}")
 
-        quiz = crud.get_quiz_by_id(session=session, quiz_id=quiz_id)
-        if not quiz:
-            raise HTTPException(status_code=404, detail="Quiz not found")
-        
-        # Calculate the quiz result
-        quiz_attempt = crud.create_quiz_attempt(
-            session=session,
-            quiz=quiz,
-            user=current_user,
-            answers=answers
+    quiz = crud.get_quiz_by_id(session=session, quiz_id=quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    # Calculate the quiz result
+    quiz_attempt = crud.create_quiz_attempt(
+        session=session,
+        quiz=quiz,
+        user=current_user,
+        answers=answers
+    )
+
+    logger.info(f"Quiz attempt result: {quiz_attempt}")
+
+    # Fetch additional data required for the response
+    user = session.get(User, current_user.id)
+    course = session.get(Course, quiz.course_id)
+
+    if not user or not course:
+        raise HTTPException(status_code=404, detail="User or course not found")
+
+    # Enrich the response with required fields
+    enriched_attempt = {
+        **quiz_attempt.__dict__,  # Include all fields from the QuizAttempt object
+        "user_name": user.name,
+        "user_email": user.email,
+        "course_name": course.title,
+    }
+
+    # Check if the user failed the quiz
+    if not quiz_attempt.passed:
+        # Use the admin_user from the dependency
+        notification_message = f"Employee {current_user.name} didn't pass the quiz."
+        print("333", admin_user.id)
+        crud.create_notification(
+            session,
+            NotificationCreate(
+                user_id=admin_user.id,  # Use admin_user.id
+                message=notification_message,
+            ),
         )
 
-        logger.info(f"Quiz attempt result: {quiz_attempt}")
-
-        # Check if the user failed the quiz
-        if not quiz_attempt.passed:
-            # Use the admin_user from the dependency
-            notification_message = f"Employee {current_user.name} didn't pass the quiz."
-            print("333",admin_user.id)
-            crud.create_notification(
-                session,
-                NotificationCreate(
-                    user_id=admin_user.id,  # Use admin_user.id
-                    message=notification_message,
-                ),
-            )
-
-        return quiz_attempt
-
-    except Exception as e:
-        logger.error(f"Error submitting quiz attempt: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    return enriched_attempt
 
 @router.get("/{quiz_id}/attempts", response_model=List[QuizAttemptPublic])
 def get_quiz_attempts(
