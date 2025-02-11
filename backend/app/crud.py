@@ -1,7 +1,6 @@
 import shutil
 from typing import Optional, Sequence
 import uuid
-from app.api.deps import CurrentSuperUser
 from sqlmodel import Session, or_, select, delete, func
 from fastapi import HTTPException, UploadFile
 
@@ -388,7 +387,7 @@ def get_attempts_for_course(session: Session, course_id: uuid.UUID, cycle: Optio
         stmt = stmt.where(QuizAttempt.assignment_cycle == cycle)
     return session.exec(stmt).all()
 
-def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate, admin_user: CurrentSuperUser,) -> QuizAttempt:
+def create_quiz_attempt(session: Session, attempt_in: QuizAttemptCreate) -> QuizAttempt:
     """Create a new quiz attempt, ensuring cycle limits are respected."""
     quiz = get_quiz_by_id(session, attempt_in.quiz_id)
     if not quiz:
