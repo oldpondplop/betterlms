@@ -11,7 +11,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { QuizzesService } from "../../client";
+import { ApiError, QuizzesService } from "../../client";
 import useCustomToast from "../../hooks/useCustomToast";
 import { handleError } from "../../utils";
 
@@ -41,7 +41,7 @@ const DeleteQuiz: React.FC<DeleteQuizProps> = ({
     },
     onError: (error) => {
       console.error('Delete quiz error:', error);
-      handleError(error, showToast);
+      handleError(error as ApiError, showToast);
     },
     onSettled: () => {
       setIsDeleting(false);

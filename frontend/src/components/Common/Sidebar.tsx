@@ -9,7 +9,6 @@ import {
   IconButton,
   Image,
   Text,
-  useColorModeValue,
   useDisclosure,
   Badge,
   Popover,
@@ -51,7 +50,7 @@ const Sidebar = () => {
   }, [currentUser?.is_superuser, refetch]);
 
   const markAsReadMutation = useMutation({
-    mutationFn: (notificationId: number) =>
+    mutationFn: (notificationId: string) =>
       NotificationsService.markNotificationAsReadEndpoint({ notificationId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });

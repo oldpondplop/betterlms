@@ -115,7 +115,7 @@ const OpenMaterialsViewer = ({ courseId, isOpen, onClose }: OpenMaterialsViewerP
               <Heading size="sm" mb={4}>
                 Materials
               </Heading>
-              {materials.map((material, index) => (
+              {materials.map((_material, index) => (
                 <Button
                   key={index}
                   w="100%"
@@ -165,7 +165,7 @@ const OpenMaterialsViewer = ({ courseId, isOpen, onClose }: OpenMaterialsViewerP
                   >
                     {!isMobile ? (
                       // Render all pages for desktop with scrolling
-                      Array.from(new Array(numPages), (el, index) => (
+                      Array.from(new Array(numPages), (_el, index) => (
                         <Box key={`page_${index + 1}`} mb={4}>
                           <Page
                             pageNumber={index + 1}

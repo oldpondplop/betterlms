@@ -19,7 +19,6 @@ import {
   import { type ApiError, type RoleCreate, RolesService } from "../../client"
   import useCustomToast from "../../hooks/useCustomToast"
   import { handleError } from "../../utils"
-import React from "react"
   
   interface AddRoleProps {
     isOpen: boolean

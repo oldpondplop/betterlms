@@ -26,14 +26,14 @@ import {
   const { logout } = useAuth()
   const queryClient = useQueryClient()
  
-  const { data: notifications, refetch } = useQuery({
+  const { data: notifications} = useQuery({
     queryKey: ["notifications"],
     queryFn: () => NotificationsService.getNotificationsEndpoint(),
   })
  
   const markAsReadMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      NotificationsService.markNotificationAsReadEndpoint({ notificationId }),
+      NotificationsService.markNotificationAsReadEndpoint({ notificationId: notificationId.toString() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] })
     },

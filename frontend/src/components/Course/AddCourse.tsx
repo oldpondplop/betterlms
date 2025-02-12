@@ -29,15 +29,13 @@ import {
   Grid,
   GridItem,
   Checkbox,
-  Text,
 } from "@chakra-ui/react";
 import { ChevronDownIcon, SearchIcon } from '@chakra-ui/icons';
 import { FaBook, FaCalendar, FaInfoCircle, FaUserTag, FaUser, FaUpload } from "react-icons/fa";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type SubmitHandler, useForm, Controller } from "react-hook-form";
 import { useState } from "react";
 import { 
-  type CourseCreate, 
   CoursesService,
   RolesService,
   UsersService,

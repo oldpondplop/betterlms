@@ -28,12 +28,11 @@ interface TakeQuizProps {
   onQuizSubmitSuccess: () => void; // Callback for successful submission
 }
 
-const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, quizData, isOpen, onClose, onQuizSubmitSuccess }) => {
+const TakeQuiz: React.FC<TakeQuizProps> = ({quizData, isOpen, onClose, onQuizSubmitSuccess }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userAnswers, setUserAnswers] = useState<number[]>([]);
   const [answerStatus, setAnswerStatus] = useState<boolean[]>([]);
   const [quizResult, setQuizResult] = useState<QuizAttemptPublic | null>(null);
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -44,7 +43,6 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, quizData, isOpen, onClose
       setUserAnswers([]);
       setAnswerStatus([]);
       setQuizResult(null);
-      setIsSubmitted(false);
     }
   }, [isOpen]);
 
@@ -59,7 +57,6 @@ const TakeQuiz: React.FC<TakeQuizProps> = ({ courseId, quizData, isOpen, onClose
     },
     onSuccess: (attempt) => {
       setQuizResult(attempt);
-      setIsSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ['quizAttempts', quizData.id] }); // Invalidate quiz attempts query
       onQuizSubmitSuccess(); // Notify parent of successful submission
       toast({

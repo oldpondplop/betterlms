@@ -1,8 +1,6 @@
 import {
     Badge,
-    Box,
     Container,
-    Flex,
     Heading,
     SkeletonText,
     Table,

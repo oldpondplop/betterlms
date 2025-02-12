@@ -24,7 +24,6 @@ import {
   } from "../../client"
   import useCustomToast from "../../hooks/useCustomToast"
   import { handleError } from "../../utils"
-import React from "react"
   
   interface EditRoleProps {
     role: RolePublic

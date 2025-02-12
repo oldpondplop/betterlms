@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Badge,
   Box,
@@ -44,7 +44,7 @@ function AnalyticsPage() {
   
   const { data: attempts, isPending, error } = useQuery({
     queryKey: ['all-quiz-attempts', showActiveOnly],
-    queryFn: () => QuizzesService.getAllQuizAttempts({ activeOnly: showActiveOnly }),
+    queryFn: () => QuizzesService.getAllQuizAttempts(),
   });
 
   const stats = attempts ? {

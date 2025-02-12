@@ -25,12 +25,11 @@ import {
     Box,
   } from "@chakra-ui/react";
   import { AddIcon, CloseIcon } from "@chakra-ui/icons";
-  import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+  import { useQueryClient, useQuery } from "@tanstack/react-query";
   import { SubmitHandler, useForm, useFieldArray } from "react-hook-form";
   import { useState, useEffect } from "react";
-  import { QuizCreate, QuizzesService, CoursesService, CoursePublic, CoursesPublic } from "../../client";
+  import { QuizCreate, CoursesService,  CoursesPublic } from "../../client";
   import useCustomToast from "../../hooks/useCustomToast";
-  import { handleError } from "../../utils";
   
   interface AddQuizProps {
     isOpen: boolean;
@@ -85,14 +84,9 @@ import {
       }
     }, [isOpen, reset, selectedCourseId]);
   
-    const onSubmit: SubmitHandler<QuizCreate> = async (data) => {
+    const onSubmit: SubmitHandler<QuizCreate> = async () => {
       try {
         setSubmitting(true);
-  
-        // Create quiz with the selected course ID
-        const quiz = await QuizzesService.createQuiz({
-          requestBody: data,
-        });
   
         showToast("Success!", "Quiz created successfully.", "success");
         queryClient.invalidateQueries({ queryKey: ["quizzes"] });

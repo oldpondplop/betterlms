@@ -8,7 +8,6 @@ import {
   type ApiError,
   LoginService,
   type UserPublic,
-  type UserRegister,
   UsersService,
 } from "../client"
 import useCustomToast from "./useCustomToast"
@@ -29,8 +28,6 @@ const useAuth = () => {
   })
 
   const signUpMutation = useMutation({
-    mutationFn: (data: UserRegister) =>
-      UsersService.registerUser({ requestBody: data }),
 
     onSuccess: () => {
       navigate({ to: "/login" })

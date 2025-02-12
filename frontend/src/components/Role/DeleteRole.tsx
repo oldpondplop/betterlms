@@ -13,7 +13,6 @@ import {
   import { type ApiError, type RolePublic, RolesService } from "../../client"
   import useCustomToast from "../../hooks/useCustomToast"
   import { handleError } from "../../utils"
-import React from "react"
   
   interface DeleteRoleProps {
     role: RolePublic

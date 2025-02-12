@@ -1,6 +1,5 @@
 import {
     Badge,
-    Box,
     Container,
     Flex,
     Heading,
@@ -18,7 +17,7 @@ import {
   import { useEffect } from "react"
   import { z } from "zod"
   
-  import { QuizzesService, CoursesService, type QuizPublic, type UserPublic, CoursePublic, CoursesPublic } from "../../client"
+  import { QuizzesService, CoursesService, type QuizPublic, type UserPublic, CoursesPublic } from "../../client"
   import AddQuiz from "../../components/Quiz/AddQuiz"
   import Navbar from "../../components/Common/Navbar"
   import { PaginationFooter } from "../../components/Common/PaginationFooter"

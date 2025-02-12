@@ -28,7 +28,7 @@ import { AddIcon, CloseIcon } from "@chakra-ui/icons";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { SubmitHandler, useForm, useFieldArray, Controller } from "react-hook-form";
 import { useState, useEffect } from "react";
-import { QuizUpdate, QuizzesService, CoursesService, CoursePublic, QuizPublic, CoursesPublic } from "../../client";
+import { QuizUpdate, QuizzesService, CoursesService,  QuizPublic, CoursesPublic, ApiError } from "../../client";
 import useCustomToast from "../../hooks/useCustomToast";
 import { handleError } from "../../utils";
 
@@ -116,7 +116,7 @@ const courses = coursesResponse?.data || [];
       onClose();
     },
     onError: (error) => {
-      handleError(error, showToast);
+      handleError(error as ApiError, showToast);
     },
   });
 
