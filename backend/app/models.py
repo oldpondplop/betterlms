@@ -273,6 +273,8 @@ class QuizAttemptPublic(QuizAttemptBase):
     user_name: Optional[str] = None
     user_email: Optional[str] = None
     course_name: Optional[str] = None
+    course_is_active: Optional[bool] = None  # Add this line
+
 
 
 class QuizAttemptsPublic(SQLModel):
@@ -336,10 +338,10 @@ class NotificationCreate(NotificationBase):
     user_id: uuid.UUID 
     
 
+# models.py
 class Notification(NotificationBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="user.id",  primary_key=True)
-
+    user_id: uuid.UUID = Field(foreign_key="user.id")  # Remove primary_key=True
     user: User = Relationship(back_populates="notifications")
 
 class NotificationPublic(NotificationBase):

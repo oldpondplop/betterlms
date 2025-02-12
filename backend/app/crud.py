@@ -284,18 +284,18 @@ def create_quiz_attempt(
 ) -> QuizAttempt:
     """Create a new quiz attempt with score calculation."""
     # Verify user is enrolled in the course
-    course_enrollment = session.exec(
-        select(CourseUserLink).where(
-            CourseUserLink.course_id == quiz.course_id,
-            CourseUserLink.user_id == user.id
-        )
-    ).first()
+    # course_enrollment = session.exec(
+    #     select(CourseUserLink).where(
+    #         CourseUserLink.course_id == quiz.course_id,
+    #         CourseUserLink.user_id == user.id
+    #     )
+    # ).first()
     
-    if not course_enrollment:
-        raise HTTPException(
-            status_code=403,
-            detail="User not enrolled in this course"
-        )
+    # if not course_enrollment:
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail="User not enrolled in this course"
+    #     )
     
     # Check attempt limit
     attempt_count = count_quiz_attempts(
@@ -332,7 +332,6 @@ def create_quiz_attempt(
         passed=score >= quiz.passing_threshold,
         attempt_number=attempt_count + 1
     )
-    print('jabajeaba',answers)
     session.add(attempt)
     session.commit()
     session.refresh(attempt)
@@ -520,25 +519,45 @@ def get_user_quiz_stats(
     }
 # NOTIFICATION REE
 def create_notification(db: Session, notification: NotificationCreate) -> Notification:
+    """Create a new notification."""
     db_notification = Notification(**notification.dict())
-    db.add(db_notification)
-    db.commit()
-    db.refresh(db_notification)
+    db.add(db_notification)  # Add the notification to the session
+    db.commit()  # Commit the transaction
+    db.refresh(db_notification)  # Refresh the instance to get the updated data
     return db_notification
 
-def get_notifications(db: Session, user_id: int) -> List[Notification]:
-    statement = select(Notification).where(Notification.user_id == user_id)
-    return db.exec(statement).all()
+def get_notifications(db: Session, user_id: UUID) -> List[Notification]:
+    """Get all notifications for a specific user."""
+    return db.query(Notification).filter(Notification.user_id == user_id).all()
 
-def mark_notification_as_read(db: Session, notification_id: int) -> Notification:
-    db_notification = db.get(Notification, notification_id)
-    if not db_notification:
+def mark_notification_as_read(
+    db: Session, 
+    notification_id: UUID,  # Change from int to UUID
+    user_id: UUID  # Add user ownership check
+) -> Notification:
+    """Mark a notification as read (only allowed for the notification owner)."""
+    notification = db.query(Notification).filter(
+        Notification.id == notification_id,
+        Notification.user_id == user_id  # Ensure the user owns the notification
+    ).first()
+    
+    if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
-    db_notification.is_read = True
-    db.add(db_notification)
+    
+    notification.is_read = True
     db.commit()
-    db.refresh(db_notification)
-    return db_notification
+    db.refresh(notification)
+    return notification
+
+def create_notifications_for_superusers(db: Session, message: str) -> None:
+    """Create notifications for all superusers."""
+    superusers = db.query(User).filter(User.is_superuser == True).all()
+    for superuser in superusers:
+        notification = NotificationCreate(
+            user_id=superuser.id,
+            message=message,
+        )
+        create_notification(db, notification)
 
 def get_all_quiz_attempts(session: Session, skip: int = 0, limit: int = 100) -> List[QuizAttempt]:
     stmt = (

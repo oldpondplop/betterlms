@@ -120,6 +120,7 @@ export type QuizAttemptPublic = {
   user_name?: string | null
   user_email?: string | null
   course_name?: string | null
+  course_is_active?: boolean | null
 }
 
 export type QuizCreate = {
@@ -378,7 +379,7 @@ export type NotificationsCreateNotificationEndpointData = {
 export type NotificationsCreateNotificationEndpointResponse = NotificationPublic
 
 export type NotificationsMarkNotificationAsReadEndpointData = {
-  notificationId: number
+  notificationId: string
 }
 
 export type NotificationsMarkNotificationAsReadEndpointResponse =

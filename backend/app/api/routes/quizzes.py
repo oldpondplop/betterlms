@@ -121,11 +121,11 @@ def submit_quiz_attempt(
     quiz_id: UUID,
     answers: List[int],
     current_user: CurrentUser,
-    admin_user: CurrentSuperUser,  # Use the superuser dependency
 ) -> Any:
     """Submit a quiz attempt."""
     logger.info(f"Received quiz attempt for quiz_id: {quiz_id}, answers: {answers}")
 
+    # Fetch the quiz from the database
     quiz = crud.get_quiz_by_id(session=session, quiz_id=quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
@@ -155,18 +155,24 @@ def submit_quiz_attempt(
         "course_name": course.title,
     }
 
-    # Check if the user failed the quiz
+    # Check if the user failed the quiz and if it's their max attempts
     if not quiz_attempt.passed:
-        # Use the admin_user from the dependency
-        notification_message = f"Employee {current_user.name} didn't pass the quiz."
-        print("333", admin_user.id)
-        crud.create_notification(
-            session,
-            NotificationCreate(
-                user_id=admin_user.id,  # Use admin_user.id
-                message=notification_message,
-            ),
-        )
+        # Fetch all failed attempts for this user and quiz
+        user_attempts = session.query(QuizAttempt).filter(
+            QuizAttempt.user_id == current_user.id,
+            QuizAttempt.quiz_id == quiz_id,
+            QuizAttempt.passed == False,  # Only count failed attempts
+        ).all()
+
+        # Use the max_attempts value from the quiz
+        max_attempts = quiz.max_attempts
+
+        # If the user has reached the max number of failed attempts, notify superusers
+        if len(user_attempts) >= max_attempts:
+            crud.create_notifications_for_superusers(
+                session,
+                message=f"Employee {current_user.name} failed the quiz {max_attempts} times."
+            )
 
     return enriched_attempt
 
@@ -266,6 +272,18 @@ def get_all_quiz_attempts(
     limit: int = 100,
 ) -> Any:
     """Get all quiz attempts across all quizzes (admin only)"""
+    # First, get all attempts but order by score desc to get successful attempts first
+    subquery = (
+        select(
+            QuizAttempt.quiz_id,
+            QuizAttempt.user_id,
+            func.max(QuizAttempt.score).label('max_score'),
+            func.max(QuizAttempt.created_at).label('latest_attempt')
+        )
+        .group_by(QuizAttempt.quiz_id, QuizAttempt.user_id)
+        .subquery()
+    )
+
     stmt = (
         select(
             QuizAttempt.id,
@@ -278,7 +296,14 @@ def get_all_quiz_attempts(
             User.name.label("user_name"),
             User.email.label("user_email"),
             Course.title.label("course_name"),
+            Course.is_active.label("course_is_active")
         )
+        .join(subquery, and_(
+            QuizAttempt.quiz_id == subquery.c.quiz_id,
+            QuizAttempt.user_id == subquery.c.user_id,
+            QuizAttempt.score == subquery.c.max_score,
+            QuizAttempt.created_at == subquery.c.latest_attempt
+        ))
         .join(User, QuizAttempt.user_id == User.id)
         .join(Quiz, QuizAttempt.quiz_id == Quiz.id)
         .join(Course, Quiz.course_id == Course.id)
@@ -295,9 +320,11 @@ def get_all_quiz_attempts(
         "passed": attempt.passed,
         "attempt_number": attempt.attempt_number,
         "created_at": attempt.created_at,
+        "updated_at": attempt.created_at,  # Using created_at as updated_at
         "quiz_id": attempt.quiz_id,
         "user_id": attempt.user_id,
         "user_name": attempt.user_name,
         "user_email": attempt.user_email,
-        "course_name": attempt.course_name
+        "course_name": attempt.course_name,
+        "course_is_active": attempt.course_is_active
     } for attempt in results]
